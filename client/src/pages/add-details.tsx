@@ -13,11 +13,13 @@ import { useLocation } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name is required"),
   type: z.enum(['home', 'out']),
   location: z.string().optional(),
+  category: z.string().optional(),
   notes: z.string().optional(),
   hasOpeningHours: z.boolean().default(false),
   openTime: z.string().optional(),
@@ -35,6 +37,15 @@ const DAYS = [
   { id: 0, label: 'Sun' },
 ];
 
+const HOME_CATEGORIES = [
+  "Leftovers",
+  "Pantry",
+  "Frozen",
+  "Snacks",
+  "Drinks",
+  "Ingredients"
+];
+
 export default function AddPage() {
   const { addItem } = useFoodStore();
   const { toast } = useToast();
@@ -46,6 +57,7 @@ export default function AddPage() {
       name: "",
       type: "out",
       location: "",
+      category: "",
       notes: "",
       hasOpeningHours: false,
       openTime: "09:00",
@@ -61,7 +73,8 @@ export default function AddPage() {
     addItem({
       name: values.name,
       type: values.type as FoodType,
-      location: values.location,
+      location: values.type === 'out' ? values.location : undefined,
+      category: values.type === 'home' ? values.category : undefined,
       notes: values.notes,
       openingHours: values.hasOpeningHours && values.openTime && values.closeTime ? {
         open: values.openTime,
@@ -100,7 +113,7 @@ export default function AddPage() {
                         <RadioGroupItem value="home" />
                       </FormControl>
                       <FormLabel className="font-normal cursor-pointer">
-                        Home (Fridge/Pantry)
+                        Home
                       </FormLabel>
                     </FormItem>
                     <FormItem className="flex items-center space-x-3 space-y-0">
@@ -108,7 +121,7 @@ export default function AddPage() {
                         <RadioGroupItem value="out" />
                       </FormControl>
                       <FormLabel className="font-normal cursor-pointer">
-                        Out (Restaurant/Stall)
+                        Out
                       </FormLabel>
                     </FormItem>
                   </RadioGroup>
@@ -123,7 +136,7 @@ export default function AddPage() {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name of Food / Place</FormLabel>
+                <FormLabel>Name</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. Chicken Rice" {...field} className="bg-card" />
                 </FormControl>
@@ -132,13 +145,40 @@ export default function AddPage() {
             )}
           />
 
+          {watchType === 'home' && (
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-card">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {HOME_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
           {watchType === 'out' && (
             <FormField
               control={form.control}
               name="location"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Location (Optional)</FormLabel>
+                  <FormLabel>Location / Area</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. Maxwell Food Centre" {...field} className="bg-card" />
                   </FormControl>
@@ -156,7 +196,7 @@ export default function AddPage() {
                 <FormLabel>Notes</FormLabel>
                 <FormControl>
                   <Textarea 
-                    placeholder="e.g. Only buy if queue is short, or 'Needs cheese'" 
+                    placeholder="e.g. Only buy if queue is short" 
                     className="resize-none bg-card" 
                     {...field} 
                   />

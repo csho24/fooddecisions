@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { addDays, isBefore, parse, getDay, format } from 'date-fns';
+import { getDay, format } from 'date-fns';
 
 export type FoodType = 'home' | 'out';
 
@@ -12,7 +12,13 @@ export interface FoodItem {
   id: string;
   name: string;
   type: FoodType;
-  location?: string; // For 'out'
+  
+  // For 'out' items
+  location?: string; 
+  
+  // For 'home' items
+  category?: string; // e.g. "Frozen", "Pantry", "Leftovers"
+
   notes?: string;
   
   // Constraints
@@ -23,11 +29,9 @@ export interface FoodItem {
 
 interface StoreState {
   items: FoodItem[];
-  filter: FoodType | 'all';
   addItem: (item: Omit<FoodItem, 'id'>) => void;
   removeItem: (id: string) => void;
-  setFilter: (filter: FoodType | 'all') => void;
-  getDecisions: () => FoodItem[];
+  checkAvailability: (item: FoodItem) => { available: boolean; reason?: string };
 }
 
 // Mock Data
@@ -36,17 +40,19 @@ const MOCK_ITEMS: FoodItem[] = [
     id: '1',
     name: 'Leftover Pizza',
     type: 'home',
+    category: 'Leftovers',
     notes: 'In the fridge, heat up for 2 mins',
   },
   {
     id: '2',
     name: 'Spicy Instant Noodles',
     type: 'home',
+    category: 'Pantry',
     notes: 'Add an egg!',
   },
   {
     id: '3',
-    name: 'Chicken Rice',
+    name: 'Tian Tian Chicken Rice',
     type: 'out',
     location: 'Maxwell Food Centre',
     closedDays: [1], // Closed Mondays
@@ -55,29 +61,37 @@ const MOCK_ITEMS: FoodItem[] = [
   },
   {
     id: '4',
-    name: 'Burger King',
+    name: 'Ah Tai Chicken Rice',
     type: 'out',
-    location: 'Mall nearby',
-    openingHours: { open: '08:00', close: '22:00' },
+    location: 'Maxwell Food Centre',
+    openingHours: { open: '11:00', close: '19:30' },
+    closedDays: [2], // Closed Tuesdays
   },
   {
     id: '5',
-    name: 'Pasta',
-    type: 'home',
-    notes: 'Need to buy sauce',
+    name: 'Burger King',
+    type: 'out',
+    location: 'Bedok Mall',
+    openingHours: { open: '08:00', close: '22:00' },
   },
   {
     id: '6',
-    name: 'Sushi Place',
+    name: 'Pasta Ingredients',
+    type: 'home',
+    category: 'Pantry',
+    notes: 'Need to buy sauce',
+  },
+  {
+    id: '7',
+    name: 'Sushi Express',
     type: 'out',
-    location: 'Downtown',
-    notes: 'Expensive but good',
+    location: 'Bedok Mall',
+    notes: 'Quick and cheap',
   }
 ];
 
 export const useFoodStore = create<StoreState>((set, get) => ({
   items: MOCK_ITEMS,
-  filter: 'all',
   
   addItem: (item) => set((state) => ({
     items: [...state.items, { ...item, id: Math.random().toString(36).substr(2, 9) }]
@@ -87,36 +101,32 @@ export const useFoodStore = create<StoreState>((set, get) => ({
     items: state.items.filter((i) => i.id !== id)
   })),
   
-  setFilter: (filter) => set({ filter }),
-  
-  getDecisions: () => {
-    const { items, filter } = get();
+  checkAvailability: (item: FoodItem) => {
+    // Home items are always available in this simplified model
+    if (item.type === 'home') return { available: true };
+
     const now = new Date();
     const currentDay = getDay(now);
     const currentTime = format(now, 'HH:mm');
+    const todayStr = format(now, 'yyyy-MM-dd');
+
+    // Check Cleaning Dates
+    if (item.cleaningDates?.includes(todayStr)) {
+      return { available: false, reason: 'Cleaning today' };
+    }
+
+    // Check Closed Days
+    if (item.closedDays?.includes(currentDay)) {
+      return { available: false, reason: 'Closed today' };
+    }
     
-    return items.filter(item => {
-      // 1. Type Filter
-      if (filter !== 'all' && item.type !== filter) return false;
-      
-      // 2. Constraint Checks (only apply if we are actually deciding right now)
-      // For simplicity, we assume "Decide" means "Right Now"
-      
-      // Check Closed Days
-      if (item.closedDays?.includes(currentDay)) return false;
-      
-      // Check Opening Hours
-      if (item.openingHours) {
-        if (currentTime < item.openingHours.open || currentTime > item.openingHours.close) {
-          return false;
-        }
+    // Check Opening Hours
+    if (item.openingHours) {
+      if (currentTime < item.openingHours.open || currentTime > item.openingHours.close) {
+        return { available: false, reason: `Opens ${item.openingHours.open} - ${item.openingHours.close}` };
       }
-      
-      // Check Cleaning Dates (Simple string match for today)
-      const todayStr = format(now, 'yyyy-MM-dd');
-      if (item.cleaningDates?.includes(todayStr)) return false;
-      
-      return true;
-    });
+    }
+
+    return { available: true };
   }
 }));
