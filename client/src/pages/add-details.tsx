@@ -50,6 +50,8 @@ export default function AddPage() {
   const { items, addItem, removeItem } = useFoodStore();
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
+  // Check if there's a selected ID from previous navigation (mock implementation using URL query would be better but trying to keep it simple without major router refactor)
+  // For now, we rely on user selecting from the list.
   const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
   const [step, setStep] = useState<'select' | 'edit'>('select');
   const [searchQuery, setSearchQuery] = useState("");

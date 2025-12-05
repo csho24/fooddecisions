@@ -33,12 +33,14 @@ interface StoreState {
   addItem: (item: Omit<FoodItem, 'id'>) => void;
   removeItem: (id: string) => void;
   checkAvailability: (item: FoodItem) => { available: boolean; reason?: string };
+  // Future proofing for archive
+  // archiveItem: (id: string, reason: 'eaten' | 'thrown') => void;
 }
 
 export const useFoodStore = create<StoreState>()(
   persist(
     (set, get) => ({
-      items: [], // Start empty as requested
+      items: [], 
       
       addItem: (item) => set((state) => ({
         items: [...state.items, { ...item, id: Math.random().toString(36).substr(2, 9) }]
@@ -49,7 +51,6 @@ export const useFoodStore = create<StoreState>()(
       })),
       
       checkAvailability: (item: FoodItem) => {
-        // Home items are always available in this simplified model
         if (item.type === 'home') return { available: true };
 
         const now = new Date();
@@ -57,17 +58,14 @@ export const useFoodStore = create<StoreState>()(
         const currentTime = format(now, 'HH:mm');
         const todayStr = format(now, 'yyyy-MM-dd');
 
-        // Check Cleaning Dates
         if (item.cleaningDates?.includes(todayStr)) {
           return { available: false, reason: 'Cleaning today' };
         }
 
-        // Check Closed Days
         if (item.closedDays?.includes(currentDay)) {
           return { available: false, reason: 'Closed today' };
         }
         
-        // Check Opening Hours
         if (item.openingHours) {
           if (currentTime < item.openingHours.open || currentTime > item.openingHours.close) {
             return { available: false, reason: `Opens ${item.openingHours.open} - ${item.openingHours.close}` };

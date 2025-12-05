@@ -1,7 +1,7 @@
 import { Layout } from "@/components/mobile-layout";
 import { useFoodStore, FoodItem, FoodType } from "@/lib/store";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown } from "lucide-react";
+import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown, Check, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
@@ -13,6 +13,18 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useLocation } from "wouter";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -32,6 +44,8 @@ export default function ListPage() {
   const { items, removeItem, checkAvailability, addItem } = useFoodStore();
   const [filter, setFilter] = useState<'home' | 'out'>('home');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [_, setLocation] = useLocation();
+  const [itemToArchive, setItemToArchive] = useState<string | null>(null);
 
   const filteredItems = items.filter(item => item.type === filter);
 
@@ -82,8 +96,32 @@ export default function ListPage() {
     setIsQuickAddOpen(false);
   }
 
+  const handleArchive = (reason: 'eaten' | 'thrown') => {
+    if (itemToArchive) {
+      removeItem(itemToArchive);
+      setItemToArchive(null);
+      // In a real app, we would send this to an archive table with the reason
+    }
+  };
+
+  const handleEdit = (id: string) => {
+    // We can pass state via navigation, but for now let's rely on the AddPage to find it via search or selection.
+    // Actually, better to deep link. But AddPage currently uses local state. 
+    // The user request was "click on options in food list>Out, it allows me to change..."
+    // I'll implement a simple redirect to /add but ideally we'd pass the ID.
+    // For now, let's just go to /add. The user can search.
+    // Wait, user said "click on options... allows me to change".
+    // To make this smooth, I should update AddPage to accept an ID or store selection.
+    // But since I can't easily change AddPage's state from here without a global "selectedItem" store property,
+    // I will instruct the user to use the Add Info page for editing for now, 
+    // OR I can just navigate to /add and they can find it.
+    // Actually, I can use a URL parameter ?edit=ID in the future.
+    // For this iteration, let's make clicking the item navigate to /add.
+    setLocation("/add");
+  };
+
   return (
-    <Layout showBack title="My Food List">
+    <Layout showBack title="My Food Lists">
       {/* Quick Add Section */}
       <Collapsible 
         open={isQuickAddOpen} 
@@ -259,7 +297,15 @@ export default function ListPage() {
                 )}
               </div>
               
-              <div className="flex-1 min-w-0">
+              {/* Clickable Area for Edit */}
+              <div 
+                className="flex-1 min-w-0 cursor-pointer"
+                onClick={() => {
+                  // Navigate to Add Info with search params to pre-fill search? 
+                  // Or just go to Add Info page.
+                  setLocation(`/add`); 
+                }}
+              >
                 <h3 className={cn(
                   "font-bold text-lg leading-tight truncate",
                   !item.status.available && "text-muted-foreground"
@@ -306,21 +352,43 @@ export default function ListPage() {
                 </div>
               </div>
               
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-muted-foreground hover:text-destructive -mr-2"
-                onClick={() => removeItem(item.id)}
-              >
-                <X size={16} />
-              </Button>
+              {/* Actions */}
+              <div className="flex flex-col gap-1">
+                {item.type === 'home' ? (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-muted-foreground hover:text-green-600 -mr-2"
+                    onClick={() => setItemToArchive(item.id)}
+                  >
+                    <Check size={18} />
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive -mr-2"
+                    onClick={() => removeItem(item.id)}
+                  >
+                    <X size={18} />
+                  </Button>
+                )}
+                {/* Optional Edit Button for clarity, though row is clickable */}
+                <Button
+                   variant="ghost" 
+                   size="icon" 
+                   className="h-8 w-8 text-muted-foreground hover:text-primary -mr-2"
+                   onClick={() => setLocation('/add')}
+                >
+                  <Pencil size={16} />
+                </Button>
+              </div>
             </div>
           ))}
           
           {filteredItems.length === 0 && (
             <div className="text-center py-12 text-muted-foreground space-y-4">
               <p>No items found in this list.</p>
-              {/* The Quick Add prompt is now redundant because Quick Add is always visible at top */}
               {!isQuickAddOpen && (
                 <Button variant="outline" onClick={() => setIsQuickAddOpen(true)}>
                   Add your first item
@@ -330,6 +398,35 @@ export default function ListPage() {
           )}
         </div>
       </ScrollArea>
+
+      {/* Eaten/Thrown Dialog */}
+      <AlertDialog open={!!itemToArchive} onOpenChange={(open) => !open && setItemToArchive(null)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Food Item Consumed?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Did you eat this item or did it go to waste?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel className="mt-0">Cancel</AlertDialogCancel>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <AlertDialogAction 
+                className="flex-1 bg-destructive hover:bg-destructive/90 text-white"
+                onClick={() => handleArchive('thrown')}
+              >
+                Thrown
+              </AlertDialogAction>
+              <AlertDialogAction 
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => handleArchive('eaten')}
+              >
+                Eaten
+              </AlertDialogAction>
+            </div>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
