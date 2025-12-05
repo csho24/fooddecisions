@@ -78,7 +78,7 @@ export default function Decide() {
 
   return (
     <Layout 
-      showBack={step === 'options' || isSearching} 
+      showBack={true} 
       title={
         isSearching ? 'Search Results' : 
         (step === 'options' ? (selectedType === 'home' ? 'Eat at Home' : 'Go Out') : 'Decide')
@@ -130,7 +130,7 @@ export default function Decide() {
             <div className="relative shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input 
-                placeholder="Search for cravings (e.g. Chicken Chop)..." 
+                placeholder="Search for cravings..." 
                 className="pl-9 pr-9 h-12 rounded-xl bg-card text-base"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

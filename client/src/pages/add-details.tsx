@@ -1,5 +1,5 @@
 import { Layout } from "@/components/mobile-layout";
-import { useFoodStore, FoodType } from "@/lib/store";
+import { useFoodStore, FoodType, FoodItem } from "@/lib/store";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,8 +14,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useEffect } from "react";
+import { Search, ChevronDown } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const formSchema = z.object({
+  id: z.string().optional(),
   name: z.string().min(2, "Name is required"),
   type: z.enum(['home', 'out']),
   location: z.string().optional(),
@@ -43,9 +47,17 @@ const HOME_CATEGORIES = [
 ];
 
 export default function AddPage() {
-  const { addItem } = useFoodStore();
+  const { items, addItem, removeItem } = useFoodStore(); // Assuming updateItem logic: remove old -> add new
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
+  const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
+  const [step, setStep] = useState<'select' | 'edit'>('select');
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter items for selection
+  const filteredItems = items.filter(item => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -65,7 +77,30 @@ export default function AddPage() {
   const watchType = form.watch("type");
   const watchHasHours = form.watch("hasOpeningHours");
 
+  // Populate form when item selected
+  useEffect(() => {
+    if (selectedItem) {
+      form.reset({
+        id: selectedItem.id,
+        name: selectedItem.name,
+        type: selectedItem.type,
+        location: selectedItem.location || "",
+        category: selectedItem.category || "",
+        notes: selectedItem.notes || "",
+        hasOpeningHours: !!selectedItem.openingHours,
+        openTime: selectedItem.openingHours?.open || "09:00",
+        closeTime: selectedItem.openingHours?.close || "21:00",
+        closedDays: selectedItem.closedDays || [],
+      });
+    }
+  }, [selectedItem, form]);
+
   function onSubmit(values: z.infer<typeof formSchema>) {
+    // If editing, remove the old item first (simple update logic)
+    if (values.id) {
+      removeItem(values.id);
+    }
+
     addItem({
       name: values.name,
       type: values.type as FoodType,
@@ -80,15 +115,80 @@ export default function AddPage() {
     });
 
     toast({
-      title: "Added!",
-      description: `${values.name} has been added to your list.`,
+      title: "Updated!",
+      description: `${values.name} details saved.`,
     });
 
     setLocation("/list");
   }
 
+  if (step === 'select') {
+    return (
+      <Layout showBack title="Add Details">
+        <div className="space-y-4 h-full flex flex-col">
+          <div className="space-y-2">
+            <h2 className="font-bold text-lg">Which item needs details?</h2>
+            <p className="text-muted-foreground text-sm">Select an item to add hours, location, or closed days.</p>
+          </div>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input 
+              placeholder="Search your list..." 
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <ScrollArea className="flex-1 -mx-4 px-4">
+            <div className="space-y-2 pb-4">
+              {filteredItems.map(item => (
+                <div 
+                  key={item.id}
+                  onClick={() => {
+                    setSelectedItem(item);
+                    setStep('edit');
+                  }}
+                  className="p-4 bg-card border border-border/50 rounded-xl flex justify-between items-center hover:bg-accent/50 cursor-pointer transition-all"
+                >
+                  <div>
+                    <h3 className="font-semibold">{item.name}</h3>
+                    <p className="text-xs text-muted-foreground capitalize">{item.type}</p>
+                  </div>
+                  <ChevronDown className="-rotate-90 text-muted-foreground" size={16} />
+                </div>
+              ))}
+              
+              {filteredItems.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No items found.</p>
+                  <Button variant="link" asChild>
+                    <a href="/list">Add a new item first</a>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
-    <Layout showBack title="Add Details">
+    <Layout showBack title="Edit Details">
+      <div className="mb-6">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="-ml-2 text-muted-foreground mb-2"
+          onClick={() => setStep('select')}
+        >
+          ← Select different item
+        </Button>
+        <h2 className="font-bold text-xl">Editing: {selectedItem?.name}</h2>
+      </div>
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-8">
           
@@ -97,7 +197,7 @@ export default function AddPage() {
             name="type"
             render={({ field }) => (
               <FormItem className="space-y-3">
-                <FormLabel>Where is this?</FormLabel>
+                <FormLabel>Type</FormLabel>
                 <FormControl>
                   <RadioGroup
                     onValueChange={field.onChange}
@@ -132,7 +232,7 @@ export default function AddPage() {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name of Food / Place</FormLabel>
+                <FormLabel>Name</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. Chicken Rice" {...field} className="bg-card" />
                 </FormControl>
@@ -315,7 +415,7 @@ export default function AddPage() {
           )}
 
           <Button type="submit" size="lg" className="w-full h-14 text-lg rounded-xl mt-6 shadow-lg shadow-primary/20">
-            Add to List
+            Save Details
           </Button>
         </form>
       </Form>
