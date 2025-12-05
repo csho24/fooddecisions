@@ -31,7 +31,7 @@ export default function Home() {
       <div className="flex-1 flex flex-col justify-center gap-6 py-8">
         <div className="mb-4 px-2">
           <h1 className="text-4xl font-bold text-primary mb-2 tracking-tight">Food<br/><span className="text-foreground italic">Faster</span></h1>
-          <p className="text-muted-foreground text-lg">Where shall we eat today?</p>
+          <p className="text-muted-foreground text-lg">what and where shall we eat today?</p>
         </div>
 
         <motion.div 

@@ -211,19 +211,19 @@ export default function AddPage() {
             <p>{watchType}</p>
           </div>
 
-          <div className="hidden">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          </div>
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name</FormLabel>
+                <FormControl>
+                  <Input {...field} className="bg-card" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {watchType === 'home' && (
             <FormField
@@ -267,24 +267,6 @@ export default function AddPage() {
               )}
             />
           )}
-
-          <FormField
-            control={form.control}
-            name="notes"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Notes</FormLabel>
-                <FormControl>
-                  <Textarea 
-                    placeholder="Notes" 
-                    className="resize-none bg-card" 
-                    {...field} 
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
 
           {watchType === 'out' && (
             <div className="space-y-4 border-t pt-4 border-border/50">
@@ -338,7 +320,7 @@ export default function AddPage() {
               )}
 
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Closed Days</Label>
+                <Label className="text-sm font-medium">Days Business is Closed</Label>
                 <div className="flex flex-wrap gap-1.5">
                   {DAYS.map((day) => (
                     <FormField
