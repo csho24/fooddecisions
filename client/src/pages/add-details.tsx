@@ -132,7 +132,7 @@ export default function AddPage() {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name</FormLabel>
+                <FormLabel>Name of Food / Place</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. Chicken Rice" {...field} className="bg-card" />
                 </FormControl>
