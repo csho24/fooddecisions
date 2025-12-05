@@ -230,9 +230,9 @@ export default function ListPage() {
                 item.type === 'home' && !status.available && "opacity-70 bg-muted/30"
               )}
             >
-              {/* Main Content Container - Adjusted padding since action buttons are gone */}
+              {/* Main Content Container with Right Padding for Absolute Button */}
               <div 
-                className="flex gap-3 items-center p-4 cursor-pointer"
+                className="flex gap-3 items-center p-4 pr-16 cursor-pointer"
                 onClick={() => setLocation(`/add?id=${item.id}`)}
               >
                 <div className={cn(
@@ -263,7 +263,31 @@ export default function ListPage() {
                 </div>
               </div>
               
-              {/* Action buttons removed as per request */}
+              {/* ABSOLUTE POSITIONED ACTION BUTTON - Guaranteed not to be cut off */}
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center z-10">
+                {item.type === 'home' ? (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-12 w-12 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors active:scale-95 shadow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setItemToArchive(item.id);
+                    }}
+                  >
+                    <Check size={24} strokeWidth={3} />
+                  </Button>
+                ) : (
+                   <Button 
+                     variant="ghost" 
+                     size="icon" 
+                     className="h-12 w-12 text-muted-foreground/50 hover:text-foreground"
+                     onClick={() => setLocation(`/add?id=${item.id}`)}
+                   >
+                     <ChevronRight size={24} />
+                   </Button>
+                )}
+              </div>
             </div>
           )})}
           
