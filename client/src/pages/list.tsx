@@ -289,66 +289,44 @@ export default function ListPage() {
                   !item.status.available && "text-muted-foreground"
                 )}>{item.name}</h3>
                 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                  {item.type === 'out' && item.location && (
-                    <span className="flex items-center gap-1 truncate max-w-[120px]">
-                      <MapPin size={12} /> {item.location}
-                    </span>
-                  )}
-                  {item.type === 'home' && item.category && (
+                {/* Show extra details ONLY for Home items (Category) */}
+                {item.type === 'home' && item.category && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                     <span className="bg-secondary/50 px-1.5 rounded text-[10px] uppercase tracking-wide font-medium">
                       {item.category}
                     </span>
-                  )}
-                </div>
-                
-                {(item.notes) && (
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                    {item.notes}
-                  </p>
+                    {(item.notes) && (
+                      <span className="truncate text-xs opacity-70 max-w-[150px]">{item.notes}</span>
+                    )}
+                  </div>
                 )}
-
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {!item.status.available && (
-                     <Badge variant="destructive" className="text-[10px] h-5 px-1.5 font-normal bg-muted-foreground text-white hover:bg-muted-foreground">
-                        {item.status.reason}
-                     </Badge>
-                  )}
-
-                  {item.closedDays && item.closedDays.length > 0 && (
-                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-red-100 text-red-700 hover:bg-red-100">
-                      Closed: {item.closedDays.map(d => DAYS[d]).join(', ')}
-                    </Badge>
-                  )}
-                  
-                  {item.openingHours && (
-                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal flex gap-1 items-center">
-                      <Clock size={10} />
-                      {item.openingHours.open}-{item.openingHours.close}
-                    </Badge>
-                  )}
-                </div>
               </div>
               
               {/* Actions */}
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 items-center justify-center pl-2">
                 {item.type === 'home' ? (
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-8 w-8 text-muted-foreground hover:text-green-600 -mr-2"
-                    onClick={() => setItemToArchive(item.id)}
+                    className="h-12 w-12 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setItemToArchive(item.id);
+                    }}
                   >
-                    <Check size={18} />
+                    <Check size={24} strokeWidth={3} />
                   </Button>
                 ) : (
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive -mr-2"
-                    onClick={() => removeItem(item.id)}
+                    className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeItem(item.id);
+                    }}
                   >
-                    <X size={18} />
+                    <X size={20} />
                   </Button>
                 )}
               </div>
