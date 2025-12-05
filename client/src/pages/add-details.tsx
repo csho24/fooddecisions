@@ -465,7 +465,7 @@ export default function AddPage() {
             
             <div className="py-4 space-y-4">
                 <div className="space-y-2">
-                    <Label>Location Name</Label>
+                    <Label>Location</Label>
                     <Input 
                         value={locationForm.watch('name')} 
                         onChange={(e) => locationForm.setValue('name', e.target.value)}
@@ -474,15 +474,7 @@ export default function AddPage() {
                     />
                 </div>
                 
-                <div className="space-y-2">
-                    <Label>Notes</Label>
-                    <Textarea 
-                        value={locationForm.watch('notes')} 
-                        onChange={(e) => locationForm.setValue('notes', e.target.value)}
-                        placeholder="Queue info, stall unit number..."
-                        className="bg-muted/30"
-                    />
-                </div>
+                {/* Notes field removed as requested */}
 
                 <Collapsible 
                     open={isHoursOpen} 
