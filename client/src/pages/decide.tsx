@@ -202,17 +202,11 @@ export default function Decide() {
                                </div>
                                
                                <div className="flex items-center gap-2 mt-1">
-                                 {item.location && (
-                                   <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <MapPin size={10} /> {item.location}
-                                   </span>
-                                 )}
                                  {item.locations && item.locations.length > 0 && (
                                    <div className="flex flex-col gap-1 mt-1">
                                      {item.locations.map(loc => (
                                        <span key={loc.id} className="text-xs text-muted-foreground flex items-center gap-1">
                                           <MapPin size={10} /> {loc.name}
-                                          {loc.closedDays?.includes(new Date().getDay()) && <span className="text-red-500 ml-1">(Closed)</span>}
                                        </span>
                                      ))}
                                    </div>

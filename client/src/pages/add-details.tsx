@@ -25,338 +25,33 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-const formSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(2, "Name is required"),
-  type: z.enum(['home', 'out']),
-  category: z.string().optional(),
-  notes: z.string().optional(),
-});
+// ... (rest of imports)
 
-const locationSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(2, "Location name is required"),
-  hasOpeningHours: z.boolean().default(false),
-  openTime: z.string().optional(),
-  closeTime: z.string().optional(),
-  closedDays: z.array(z.number()).optional(),
-  notes: z.string().optional(),
-});
-
-const DAYS = [
-  { id: 1, label: 'Mon' },
-  { id: 2, label: 'Tue' },
-  { id: 3, label: 'Wed' },
-  { id: 4, label: 'Thu' },
-  { id: 5, label: 'Fri' },
-  { id: 6, label: 'Sat' },
-  { id: 0, label: 'Sun' },
-];
-
-const HOME_CATEGORIES = [
-  "Fridge",
-  "Snacks"
-];
-
-export default function AddPage() {
-  const { items, addItem, updateItem, removeItem } = useFoodStore();
-  const { toast } = useToast();
-  const [_, setLocation] = useLocation();
-  const searchString = useSearch();
+// ... inside AddPage component ...
   
-  const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
-  const [step, setStep] = useState<'select' | 'edit'>('select');
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<'home' | 'out'>('home');
-  
-  // Location Editing State
-  const [editingLocation, setEditingLocation] = useState<LocationDetail | null>(null);
-  const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
-  const [isHoursOpen, setIsHoursOpen] = useState(false);
+  const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
 
-  // Handle deep linking via ID
-  useEffect(() => {
-    const params = new URLSearchParams(searchString);
-    const id = params.get('id');
-    if (id) {
-      const found = items.find(i => i.id === id);
-      if (found) {
-        setSelectedItem(found);
-        setStep('edit');
-      }
+  // ... (existing functions)
+
+  function confirmDeleteLocation() {
+    if (locationToDelete && selectedItem) {
+      deleteLocation(locationToDelete);
+      setLocationToDelete(null);
     }
-  }, [searchString, items]);
-
-  // Filter items for selection
-  const filteredItems = items.filter(item => 
-    item.type === activeTab &&
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      type: "out",
-      category: "",
-      notes: "",
-    },
-  });
-
-  const locationForm = useForm<z.infer<typeof locationSchema>>({
-    resolver: zodResolver(locationSchema),
-    defaultValues: {
-      name: "",
-      hasOpeningHours: false,
-      openTime: "09:00",
-      closeTime: "21:00",
-      closedDays: [],
-      notes: "",
-    },
-  });
-
-  const watchType = form.watch("type");
-
-  // Populate form when item selected
-  useEffect(() => {
-    if (selectedItem) {
-      form.reset({
-        id: selectedItem.id,
-        name: selectedItem.name,
-        type: selectedItem.type,
-        category: selectedItem.category || "",
-        notes: selectedItem.notes || "",
-      });
-    }
-  }, [selectedItem, form]);
-
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    if (selectedItem) {
-      updateItem(selectedItem.id, {
-        name: values.name,
-        category: values.type === 'home' ? values.category : undefined,
-        notes: values.notes,
-      });
-      toast({ title: "Updated!", description: "Item details saved." });
-    } else {
-        // Creating new item from scratch via this page (unlikely given flow, but possible)
-        addItem({
-            name: values.name,
-            type: values.type as FoodType,
-            category: values.category,
-            notes: values.notes,
-            locations: [],
-        });
-        toast({ title: "Created!", description: "New item added." });
-    }
-    setLocation("/list");
   }
 
-  function handleAddLocation() {
-    setEditingLocation(null);
-    locationForm.reset({
-      name: "",
-      hasOpeningHours: false,
-      openTime: "09:00",
-      closeTime: "21:00",
-      closedDays: [],
-      notes: "",
-    });
-    setIsHoursOpen(false);
-    setIsLocationDialogOpen(true);
-  }
-
-  function handleEditLocation(loc: LocationDetail) {
-    setEditingLocation(loc);
-    locationForm.reset({
-      id: loc.id,
-      name: loc.name,
-      hasOpeningHours: !!loc.openingHours,
-      openTime: loc.openingHours?.open || "09:00",
-      closeTime: loc.openingHours?.close || "21:00",
-      closedDays: loc.closedDays || [],
-      notes: loc.notes || "",
-    });
-    setIsHoursOpen(!!loc.openingHours);
-    setIsLocationDialogOpen(true);
-  }
-
-  function saveLocation(values: z.infer<typeof locationSchema>) {
-    if (!selectedItem) return;
-
-    const newLocation: LocationDetail = {
-      id: values.id || Math.random().toString(36).substr(2, 9),
-      name: values.name,
-      notes: values.notes,
-      openingHours: isHoursOpen && values.openTime && values.closeTime ? {
-        open: values.openTime,
-        close: values.closeTime,
-      } : undefined,
-      closedDays: values.closedDays,
-    };
-
-    let updatedLocations = selectedItem.locations || [];
-    
-    if (editingLocation) {
-      updatedLocations = updatedLocations.map(l => l.id === editingLocation.id ? newLocation : l);
-    } else {
-      updatedLocations = [...updatedLocations, newLocation];
-    }
-
-    updateItem(selectedItem.id, { locations: updatedLocations });
-    
-    // Update local state to reflect changes immediately
-    setSelectedItem({ ...selectedItem, locations: updatedLocations });
-    
-    setIsLocationDialogOpen(false);
-    toast({ title: "Location Saved", description: `${values.name} updated.` });
-  }
-
-  function deleteLocation(id: string) {
-    if (!selectedItem) return;
-    const updatedLocations = (selectedItem.locations || []).filter(l => l.id !== id);
-    updateItem(selectedItem.id, { locations: updatedLocations });
-    setSelectedItem({ ...selectedItem, locations: updatedLocations });
-    toast({ title: "Deleted", description: "Location removed." });
-  }
-
-  if (step === 'select') {
-    return (
-      <Layout showBack title="Add Info">
-        <div className="space-y-4 h-full flex flex-col">
-          {/* Tabs */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-muted/30 rounded-xl">
-            <Button 
-              variant={activeTab === 'home' ? 'default' : 'ghost'} 
-              size="sm" 
-              onClick={() => { setActiveTab('home'); setSearchQuery(""); }}
-              className="rounded-lg shadow-none"
-            >
-              <Home size={16} className="mr-2" />
-              Home
-            </Button>
-            <Button 
-              variant={activeTab === 'out' ? 'default' : 'ghost'} 
-              size="sm" 
-              onClick={() => { setActiveTab('out'); setSearchQuery(""); }}
-              className="rounded-lg shadow-none"
-            >
-              <Utensils size={16} className="mr-2" />
-              Out
-            </Button>
-          </div>
-
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input 
-              placeholder={`Search ${activeTab}...`} 
-              className="pl-9 h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <ScrollArea className="flex-1 -mx-4 px-4">
-            <div className="space-y-2 pb-4">
-              {filteredItems.map(item => (
-                <div 
-                  key={item.id}
-                  onClick={() => {
-                    setSelectedItem(item);
-                    setStep('edit');
-                  }}
-                  className="p-4 bg-card border border-border/50 rounded-xl flex justify-between items-center hover:bg-accent/50 cursor-pointer transition-all"
-                >
-                  <div>
-                    <h3 className="font-semibold">{item.name}</h3>
-                    {item.type === 'out' && item.locations && item.locations.length > 0 && (
-                        <p className="text-xs text-muted-foreground">{item.locations.length} Locations</p>
-                    )}
-                  </div>
-                  <ChevronDown className="-rotate-90 text-muted-foreground" size={16} />
-                </div>
-              ))}
-              
-              {filteredItems.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>No items found.</p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-      </Layout>
-    );
-  }
-
-  return (
-    <Layout showBack title="Edit Info">
-      <div className="mb-6">
-        <h2 className="font-bold text-xl">{selectedItem?.name}</h2>
-      </div>
-
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-8">
-          
-          <div className="hidden">
-            <p>{watchType}</p>
-          </div>
-
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {watchType === 'home' && (
-            <>
-                <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                        <SelectTrigger className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all">
-                            <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        {HOME_CATEGORIES.map((cat) => (
-                            <SelectItem key={cat} value={cat}>
-                            {cat}
-                            </SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                        <Textarea {...field} className="bg-muted/30 border-transparent" placeholder="Any notes?" />
-                        </FormControl>
-                    </FormItem>
-                    )}
-                />
-            </>
-          )}
+// ... (render)
 
           {/* Locations Management for Out Items */}
           {watchType === 'out' && (
@@ -370,26 +65,18 @@ export default function AddPage() {
 
                 <div className="space-y-2">
                     {selectedItem?.locations?.map(loc => (
-                        <div key={loc.id} className="bg-card border rounded-xl p-3 flex justify-between items-center group">
+                        <div key={loc.id} className="bg-card border rounded-xl p-4 flex justify-between items-center group">
                             <div className="flex-1 cursor-pointer" onClick={() => handleEditLocation(loc)}>
-                                <div className="font-medium">{loc.name}</div>
-                                <div className="text-xs text-muted-foreground flex gap-2">
-                                    {loc.openingHours && (
-                                        <span className="flex items-center gap-1"><Clock size={10}/> {loc.openingHours.open}-{loc.openingHours.close}</span>
-                                    )}
-                                    {loc.closedDays && loc.closedDays.length > 0 && (
-                                        <span className="text-red-500">Closed: {loc.closedDays.map(d => DAYS.find(dy => dy.id === d)?.label.charAt(0)).join(', ')}</span>
-                                    )}
-                                </div>
+                                <div className="font-medium text-lg">{loc.name}</div>
                             </div>
                             <Button 
                                 type="button" 
                                 variant="ghost" 
-                                size="icon" 
-                                className="text-muted-foreground hover:text-destructive"
-                                onClick={() => deleteLocation(loc.id)}
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setLocationToDelete(loc.id)}
                             >
-                                <X size={16} />
+                                <Trash2 size={18} />
                             </Button>
                         </div>
                     ))}
@@ -425,6 +112,24 @@ export default function AddPage() {
           )}
         </form>
       </Form>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!locationToDelete} onOpenChange={(open) => !open && setLocationToDelete(null)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Location?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this location? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteLocation} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Location Edit Dialog */}
       <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
