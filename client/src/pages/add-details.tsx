@@ -430,7 +430,7 @@ export default function AddPage() {
       <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
         <DialogContent className="max-w-[90%] w-full rounded-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-                <DialogTitle>{editingLocation ? 'Edit Location' : 'Add Location'}</DialogTitle>
+                <DialogTitle>{editingLocation ? 'Edit Location Details' : 'Add Location'}</DialogTitle>
             </DialogHeader>
             
             <div className="py-4 space-y-4">
@@ -444,6 +444,20 @@ export default function AddPage() {
                     />
                 </div>
 
+                {/* Only show details fields if we are EDITING or if user wants to expand them.
+                    But user said "When I click add location I don't want to see the rest of it".
+                    So let's hide the detailed fields for a NEW location unless explicitly toggled.
+                    Actually, the simplest interpretation is: Add = Name Only. Edit = Full Box.
+                    Let's just make the details collapsible or conditional on 'editingLocation' existing?
+                    User said: "only in 'add info' function does the full box appear.. and thats correct."
+                    Wait, this page IS 'Add Info'. 
+                    So maybe they want the full box HERE.
+                    
+                    Let's keep the full box here because we are in 'Add Info' page.
+                    BUT the user said "When i click add location, i dont wanna see the rest of it".
+                    This implies the 'Add Location' dialog should be simple.
+                */}
+                
                 <div className="space-y-2">
                     <Label>Notes</Label>
                     <Textarea 

@@ -33,7 +33,7 @@ const quickAddSchema = z.object({
   name: z.string().min(2, "Name is required"),
   type: z.enum(['home', 'out']),
   category: z.string().optional(), // For Home
-  // Location removed from quick add for 'out' type as requested - just name first
+  location: z.string().optional(), // For Out - Restored
 });
 
 export default function ListPage() {
@@ -47,8 +47,6 @@ export default function ListPage() {
 
   // Sort items
   const sortedItems = filteredItems.sort((a, b) => {
-    // For Home: Check availability? Home is always available.
-    // For Out: Just sort by name for now as per request to keep it simple list
     return a.name.localeCompare(b.name);
   });
 
@@ -59,6 +57,7 @@ export default function ListPage() {
       name: "",
       type: "home", 
       category: "",
+      location: "",
     },
   });
 
@@ -69,12 +68,18 @@ export default function ListPage() {
       name: values.name,
       type: values.type as FoodType,
       category: values.type === 'home' ? values.category : undefined,
-      locations: values.type === 'out' ? [] : undefined, // Initialize empty locations array
+      // If Out type and location provided, add it as the first location
+      locations: values.type === 'out' && values.location ? [{
+        id: Math.random().toString(36).substr(2, 9),
+        name: values.location,
+        // Default hours/closed days can be empty
+      }] : [],
     });
     form.reset({
       name: "",
       type: values.type as FoodType, 
       category: "",
+      location: "",
     });
     setIsQuickAddOpen(false);
   }
@@ -163,7 +168,7 @@ export default function ListPage() {
                     />
                   </div>
 
-                  {watchType === 'home' && (
+                  {watchType === 'home' ? (
                     <FormField
                       control={form.control}
                       name="category"
@@ -183,6 +188,19 @@ export default function ListPage() {
                               ))}
                             </SelectContent>
                           </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input placeholder="Location" {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -222,70 +240,67 @@ export default function ListPage() {
       </div>
 
       <ScrollArea className="flex-1 -mx-4 px-4">
-        <div className="space-y-3 pb-8">
+        <div className="space-y-3 pb-20">
           {sortedItems.map((item) => {
-            // Only check availability for Home items in this list view logic, 
-            // or if we want to show 'available' for Out items based on at least one location being open?
-            // User asked for "Food Names" only for Out.
             const status = checkAvailability(item);
-            
             return (
             <div 
               key={item.id}
               className={cn(
-                "bg-card border border-border/50 p-4 pr-6 rounded-2xl shadow-sm hover:shadow-md transition-all flex gap-3 items-center group relative min-h-[80px]",
+                "bg-card border border-border/50 rounded-2xl shadow-sm hover:shadow-md transition-all relative min-h-[80px]",
                 item.type === 'home' && !status.available && "opacity-70 bg-muted/30"
               )}
             >
-              <div className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 relative",
-                item.type === 'home' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600",
-                item.type === 'home' && !status.available && "grayscale opacity-50"
-              )}>
-                {item.type === 'home' ? <Home size={20} /> : <Utensils size={20} />}
-              </div>
-              
-              {/* Clickable Area for Edit */}
+              {/* Main Content Container with Right Padding for Absolute Button */}
               <div 
-                className="flex-1 min-w-0 cursor-pointer self-stretch flex flex-col justify-center"
-                onClick={() => {
-                  setLocation(`/add?id=${item.id}`); 
-                }}
+                className="flex gap-3 items-center p-4 pr-16 cursor-pointer"
+                onClick={() => setLocation(`/add?id=${item.id}`)}
               >
-                <h3 className={cn(
-                  "font-bold text-lg leading-tight truncate pr-2",
-                  item.type === 'home' && !status.available && "text-muted-foreground"
-                )}>{item.name}</h3>
+                <div className={cn(
+                  "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 relative",
+                  item.type === 'home' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600",
+                  item.type === 'home' && !status.available && "grayscale opacity-50"
+                )}>
+                  {item.type === 'home' ? <Home size={20} /> : <Utensils size={20} />}
+                </div>
                 
-                {/* Show extra details ONLY for Home items (Category) */}
-                {item.type === 'home' && item.category && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                    <span className="bg-secondary/50 px-1.5 rounded text-[10px] uppercase tracking-wide font-medium">
-                      {item.category}
-                    </span>
-                    {(item.notes) && (
-                      <span className="truncate text-xs opacity-70 max-w-[150px]">{item.notes}</span>
-                    )}
-                  </div>
-                )}
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <h3 className={cn(
+                    "font-bold text-lg leading-tight truncate",
+                    item.type === 'home' && !status.available && "text-muted-foreground"
+                  )}>{item.name}</h3>
+                  
+                  {/* Home Details */}
+                  {item.type === 'home' && item.category && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                      <span className="bg-secondary/50 px-1.5 rounded text-[10px] uppercase tracking-wide font-medium">
+                        {item.category}
+                      </span>
+                      {(item.notes) && (
+                        <span className="truncate text-xs opacity-70 max-w-[150px]">{item.notes}</span>
+                      )}
+                    </div>
+                  )}
 
-                {/* For Out items, show location count if multiple */}
-                {item.type === 'out' && item.locations && item.locations.length > 0 && (
-                   <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                     <span className="flex items-center gap-1">
-                       <MapPin size={12} /> {item.locations.length} Location{item.locations.length !== 1 ? 's' : ''}
-                     </span>
-                   </div>
-                )}
+                  {/* Out Details - Show Location names if any */}
+                  {item.type === 'out' && item.locations && item.locations.length > 0 && (
+                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                       <span className="flex items-center gap-1 truncate">
+                         <MapPin size={12} /> 
+                         {item.locations.map(l => l.name).join(", ")}
+                       </span>
+                     </div>
+                  )}
+                </div>
               </div>
               
-              {/* Actions - Only for Home items now */}
-              {item.type === 'home' && (
-                <div className="flex flex-col gap-1 items-center justify-center shrink-0 -mr-2">
+              {/* ABSOLUTE POSITIONED ACTION BUTTON - Guaranteed not to be cut off */}
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center z-10">
+                {item.type === 'home' ? (
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-12 w-12 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors active:scale-95"
+                    className="h-12 w-12 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors active:scale-95 shadow-sm"
                     onClick={(e) => {
                       e.stopPropagation();
                       setItemToArchive(item.id);
@@ -293,22 +308,17 @@ export default function ListPage() {
                   >
                     <Check size={24} strokeWidth={3} />
                   </Button>
-                </div>
-              )}
-              
-              {/* For Out items, show a chevron to indicate drill-down */}
-              {item.type === 'out' && (
-                 <div className="flex flex-col gap-1 items-center justify-center shrink-0 -mr-2">
+                ) : (
                    <Button 
                      variant="ghost" 
                      size="icon" 
-                     className="h-12 w-12 text-muted-foreground/50"
+                     className="h-12 w-12 text-muted-foreground/50 hover:text-foreground"
                      onClick={() => setLocation(`/add?id=${item.id}`)}
                    >
                      <ChevronRight size={24} />
                    </Button>
-                 </div>
-              )}
+                )}
+              </div>
             </div>
           )})}
           
