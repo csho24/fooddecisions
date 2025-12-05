@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
-import { Search, ChevronDown } from "lucide-react";
+import { Search, ChevronDown, Home, Utensils } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const formSchema = z.object({
@@ -47,15 +47,17 @@ const HOME_CATEGORIES = [
 ];
 
 export default function AddPage() {
-  const { items, addItem, removeItem } = useFoodStore(); // Assuming updateItem logic: remove old -> add new
+  const { items, addItem, removeItem } = useFoodStore();
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
   const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
   const [step, setStep] = useState<'select' | 'edit'>('select');
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<'home' | 'out'>('home');
 
   // Filter items for selection
   const filteredItems = items.filter(item => 
+    item.type === activeTab &&
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -96,7 +98,6 @@ export default function AddPage() {
   }, [selectedItem, form]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    // If editing, remove the old item first (simple update logic)
     if (values.id) {
       removeItem(values.id);
     }
@@ -127,14 +128,36 @@ export default function AddPage() {
       <Layout showBack title="Add Details">
         <div className="space-y-4 h-full flex flex-col">
           <div className="space-y-2">
-            <h2 className="font-bold text-lg">Which item needs details?</h2>
-            <p className="text-muted-foreground text-sm">Select an item to add hours, location, or closed days.</p>
+            <h2 className="font-bold text-lg">Select item to edit</h2>
+            <p className="text-muted-foreground text-sm">Choose a category to find your item.</p>
+          </div>
+
+          {/* Tabs */}
+          <div className="grid grid-cols-2 gap-2 p-1 bg-muted/30 rounded-xl">
+            <Button 
+              variant={activeTab === 'home' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => { setActiveTab('home'); setSearchQuery(""); }}
+              className="rounded-lg shadow-none"
+            >
+              <Home size={16} className="mr-2" />
+              Home
+            </Button>
+            <Button 
+              variant={activeTab === 'out' ? 'default' : 'ghost'} 
+              size="sm" 
+              onClick={() => { setActiveTab('out'); setSearchQuery(""); }}
+              className="rounded-lg shadow-none"
+            >
+              <Utensils size={16} className="mr-2" />
+              Out
+            </Button>
           </div>
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input 
-              placeholder="Search your list..." 
+              placeholder={`Search ${activeTab}...`} 
               className="pl-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -154,18 +177,21 @@ export default function AddPage() {
                 >
                   <div>
                     <h3 className="font-semibold">{item.name}</h3>
-                    <p className="text-xs text-muted-foreground capitalize">{item.type}</p>
+                    <div className="flex gap-2 text-xs text-muted-foreground">
+                      {item.type === 'home' && item.category && <span>{item.category}</span>}
+                      {item.type === 'out' && item.location && <span>{item.location}</span>}
+                    </div>
                   </div>
                   <ChevronDown className="-rotate-90 text-muted-foreground" size={16} />
                 </div>
               ))}
               
               {filteredItems.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground">
                   <p>No items found.</p>
-                  <Button variant="link" asChild>
-                    <a href="/list">Add a new item first</a>
-                  </Button>
+                  {searchQuery.trim() === "" && (
+                    <p className="text-xs mt-1">Try searching or check the other tab</p>
+                  )}
                 </div>
               )}
             </div>
@@ -184,7 +210,7 @@ export default function AddPage() {
           className="-ml-2 text-muted-foreground mb-2"
           onClick={() => setStep('select')}
         >
-          ← Select different item
+          ← Back to list
         </Button>
         <h2 className="font-bold text-xl">Editing: {selectedItem?.name}</h2>
       </div>
@@ -192,40 +218,19 @@ export default function AddPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-8">
           
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <FormItem className="space-y-3">
-                <FormLabel>Type</FormLabel>
-                <FormControl>
-                  <RadioGroup
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    className="flex gap-4"
-                  >
-                    <FormItem className="flex items-center space-x-3 space-y-0">
-                      <FormControl>
-                        <RadioGroupItem value="home" />
-                      </FormControl>
-                      <FormLabel className="font-normal cursor-pointer">
-                        Home
-                      </FormLabel>
-                    </FormItem>
-                    <FormItem className="flex items-center space-x-3 space-y-0">
-                      <FormControl>
-                        <RadioGroupItem value="out" />
-                      </FormControl>
-                      <FormLabel className="font-normal cursor-pointer">
-                        Out
-                      </FormLabel>
-                    </FormItem>
-                  </RadioGroup>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {/* Hidden Type Field - we just display it */}
+          <div className="p-4 bg-muted/30 rounded-xl flex items-center gap-3">
+            <div className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center",
+              watchType === 'home' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"
+            )}>
+              {watchType === 'home' ? <Home size={20} /> : <Utensils size={20} />}
+            </div>
+            <div>
+              <p className="font-medium capitalize">{watchType}</p>
+              <p className="text-xs text-muted-foreground">Changing type requires re-creating item</p>
+            </div>
+          </div>
 
           <FormField
             control={form.control}
