@@ -389,7 +389,7 @@ export default function AddPage() {
                                 className="text-muted-foreground hover:text-destructive"
                                 onClick={() => deleteLocation(loc.id)}
                             >
-                                <X size={16} />
+                                <Trash2 size={16} />
                             </Button>
                         </div>
                     ))}
