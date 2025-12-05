@@ -1,10 +1,10 @@
 import { Layout } from "@/components/mobile-layout";
 import { useFoodStore, FoodItem, FoodType } from "@/lib/store";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Home, Store, Clock, X, MapPin, AlertCircle, Plus, ChevronDown } from "lucide-react";
+import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,10 +30,10 @@ const quickAddSchema = z.object({
 
 export default function ListPage() {
   const { items, removeItem, checkAvailability, addItem } = useFoodStore();
-  const [filter, setFilter] = useState<'all' | 'home' | 'out'>('all');
+  const [filter, setFilter] = useState<'home' | 'out'>('home');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
-  const filteredItems = items.filter(item => filter === 'all' || item.type === filter);
+  const filteredItems = items.filter(item => item.type === filter);
 
   // Sort items: Available first, then Unavailable
   const sortedItems = filteredItems.map(item => ({
@@ -50,12 +50,21 @@ export default function ListPage() {
     defaultValues: {
       name: "",
       type: "home", // Default to home for quick add
-      category: "Snacks",
+      category: "",
       location: "",
     },
   });
 
   const watchType = form.watch("type");
+
+  // Reset category/location when type changes to avoid "left behind" values
+  useEffect(() => {
+    if (watchType === 'out') {
+      form.setValue('category', '');
+    } else {
+      form.setValue('location', '');
+    }
+  }, [watchType, form]);
 
   function onQuickAdd(values: z.infer<typeof quickAddSchema>) {
     addItem({
@@ -67,8 +76,8 @@ export default function ListPage() {
     form.reset({
       name: "",
       type: values.type as FoodType, // Keep last type
-      category: values.category, // Keep last category
-      location: values.location, // Keep last location
+      category: "",
+      location: "",
     });
     setIsQuickAddOpen(false);
   }
@@ -112,7 +121,7 @@ export default function ListPage() {
                             type="button"
                             variant="ghost"
                             className={cn(
-                              "flex-1 h-8 rounded-md text-xs font-medium",
+                              "flex-1 h-8 rounded-md text-xs font-medium transition-all",
                               field.value === 'home' && "bg-background shadow-sm text-foreground"
                             )}
                             onClick={() => field.onChange('home')}
@@ -123,7 +132,7 @@ export default function ListPage() {
                             type="button"
                             variant="ghost"
                             className={cn(
-                              "flex-1 h-8 rounded-md text-xs font-medium",
+                              "flex-1 h-8 rounded-md text-xs font-medium transition-all",
                               field.value === 'out' && "bg-background shadow-sm text-foreground"
                             )}
                             onClick={() => field.onChange('out')}
@@ -156,7 +165,7 @@ export default function ListPage() {
                       name="category"
                       render={({ field }) => (
                         <FormItem>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger className="h-10">
                                 <SelectValue placeholder="Category" />
@@ -200,29 +209,23 @@ export default function ListPage() {
       </Collapsible>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-muted/30 rounded-xl">
         <Button 
-          variant={filter === 'all' ? 'default' : 'outline'} 
-          size="sm" 
-          onClick={() => setFilter('all')}
-          className="rounded-full"
-        >
-          All
-        </Button>
-        <Button 
-          variant={filter === 'home' ? 'default' : 'outline'} 
+          variant={filter === 'home' ? 'default' : 'ghost'} 
           size="sm" 
           onClick={() => setFilter('home')}
-          className="rounded-full"
+          className="rounded-lg shadow-none"
         >
+          <Home size={16} className="mr-2" />
           Home
         </Button>
         <Button 
-          variant={filter === 'out' ? 'default' : 'outline'} 
+          variant={filter === 'out' ? 'default' : 'ghost'} 
           size="sm" 
           onClick={() => setFilter('out')}
-          className="rounded-full"
+          className="rounded-lg shadow-none"
         >
+          <Utensils size={16} className="mr-2" />
           Out
         </Button>
       </div>
@@ -247,7 +250,7 @@ export default function ListPage() {
                 item.type === 'home' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600",
                 !item.status.available && "grayscale opacity-50"
               )}>
-                {item.type === 'home' ? <Home size={20} /> : <Store size={20} />}
+                {item.type === 'home' ? <Home size={20} /> : <Utensils size={20} />}
                 
                 {!item.status.available && (
                   <div className="absolute -top-1 -right-1 bg-muted-foreground text-white rounded-full p-0.5 border-2 border-card">
