@@ -113,9 +113,8 @@ export default function ListPage() {
             <div className="p-3 space-y-3">
               <div className="flex items-center justify-between mb-2">
                  <h3 className="font-semibold text-sm">Quick Add</h3>
-                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground" onClick={() => setIsQuickAddOpen(false)}>
-                   <span className="sr-only">Close</span>
-                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-minus"><path d="M5 12h14"/></svg>
+                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsQuickAddOpen(false)}>
+                   <X size={16} />
                  </Button>
               </div>
               
@@ -254,7 +253,7 @@ export default function ListPage() {
             >
               {/* Main Content Container with Right Padding for Absolute Button */}
               <div 
-                className="flex gap-3 items-center p-4 pr-24 cursor-pointer"
+                className="flex gap-3 items-center p-4 pr-16 cursor-pointer"
                 onClick={() => setLocation(`/add?id=${item.id}`)}
               >
                 <div className={cn(
@@ -295,8 +294,8 @@ export default function ListPage() {
                 </div>
               </div>
               
-              {/* ABSOLUTE POSITIONED ACTION BUTTON - Moved further left to avoid cutoff */}
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center z-10">
+              {/* ABSOLUTE POSITIONED ACTION BUTTON - Guaranteed not to be cut off */}
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center z-10">
                 {item.type === 'home' ? (
                   <Button 
                     variant="ghost" 
