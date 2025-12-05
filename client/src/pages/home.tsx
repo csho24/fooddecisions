@@ -62,7 +62,7 @@ export default function Home() {
           </Link>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* List Card */}
+            {/* Food List Card */}
             <Link href="/list">
               <motion.div 
                 variants={item}
@@ -76,14 +76,13 @@ export default function Home() {
                     <List size={20} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-secondary-foreground">My List</h2>
-                    <p className="text-xs text-secondary-foreground/70 mt-1">View all options</p>
+                    <h2 className="text-xl font-bold text-secondary-foreground">Food List</h2>
                   </div>
                 </div>
               </motion.div>
             </Link>
 
-            {/* Add Details Card */}
+            {/* Add Info Card */}
             <Link href="/add">
               <motion.div 
                 variants={item}
@@ -97,8 +96,7 @@ export default function Home() {
                     <Plus size={20} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-foreground">Add</h2>
-                    <p className="text-xs text-muted-foreground mt-1">New items & info</p>
+                    <h2 className="text-xl font-bold text-foreground">Add Info</h2>
                   </div>
                 </div>
               </motion.div>

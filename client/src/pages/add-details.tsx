@@ -125,13 +125,8 @@ export default function AddPage() {
 
   if (step === 'select') {
     return (
-      <Layout showBack title="Add Details">
+      <Layout showBack title="Add Info">
         <div className="space-y-4 h-full flex flex-col">
-          <div className="space-y-2">
-            <h2 className="font-bold text-lg">Select item to edit</h2>
-            <p className="text-muted-foreground text-sm">Choose a category to find your item.</p>
-          </div>
-
           {/* Tabs */}
           <div className="grid grid-cols-2 gap-2 p-1 bg-muted/30 rounded-xl">
             <Button 
@@ -177,10 +172,6 @@ export default function AddPage() {
                 >
                   <div>
                     <h3 className="font-semibold">{item.name}</h3>
-                    <div className="flex gap-2 text-xs text-muted-foreground">
-                      {item.type === 'home' && item.category && <span>{item.category}</span>}
-                      {item.type === 'out' && item.location && <span>{item.location}</span>}
-                    </div>
                   </div>
                   <ChevronDown className="-rotate-90 text-muted-foreground" size={16} />
                 </div>
@@ -189,9 +180,6 @@ export default function AddPage() {
               {filteredItems.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
                   <p>No items found.</p>
-                  {searchQuery.trim() === "" && (
-                    <p className="text-xs mt-1">Try searching or check the other tab</p>
-                  )}
                 </div>
               )}
             </div>
@@ -202,7 +190,7 @@ export default function AddPage() {
   }
 
   return (
-    <Layout showBack title="Edit Details">
+    <Layout showBack title="Edit Info">
       <div className="mb-6">
         <Button 
           variant="ghost" 
@@ -210,41 +198,32 @@ export default function AddPage() {
           className="-ml-2 text-muted-foreground mb-2"
           onClick={() => setStep('select')}
         >
-          ← Back to list
+          ← Back
         </Button>
-        <h2 className="font-bold text-xl">Editing: {selectedItem?.name}</h2>
+        <h2 className="font-bold text-xl">{selectedItem?.name}</h2>
       </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-8">
           
           {/* Hidden Type Field - we just display it */}
-          <div className="p-4 bg-muted/30 rounded-xl flex items-center gap-3">
-            <div className={cn(
-              "w-10 h-10 rounded-full flex items-center justify-center",
-              watchType === 'home' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600"
-            )}>
-              {watchType === 'home' ? <Home size={20} /> : <Utensils size={20} />}
-            </div>
-            <div>
-              <p className="font-medium capitalize">{watchType}</p>
-              <p className="text-xs text-muted-foreground">Changing type requires re-creating item</p>
-            </div>
+          <div className="hidden">
+            <p>{watchType}</p>
           </div>
 
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g. Chicken Rice" {...field} className="bg-card" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="hidden">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
 
           {watchType === 'home' && (
             <FormField
@@ -279,9 +258,9 @@ export default function AddPage() {
               name="location"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Location / Area</FormLabel>
+                  <FormLabel>Location</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Maxwell Food Centre" {...field} className="bg-card" />
+                    <Input placeholder="Location" {...field} className="bg-card" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -297,7 +276,7 @@ export default function AddPage() {
                 <FormLabel>Notes</FormLabel>
                 <FormControl>
                   <Textarea 
-                    placeholder="e.g. Only buy if queue is short" 
+                    placeholder="Notes" 
                     className="resize-none bg-card" 
                     {...field} 
                   />
@@ -309,8 +288,6 @@ export default function AddPage() {
 
           {watchType === 'out' && (
             <div className="space-y-4 border-t pt-4 border-border/50">
-              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Constraints</h3>
-              
               <FormField
                 control={form.control}
                 name="hasOpeningHours"
@@ -318,7 +295,7 @@ export default function AddPage() {
                   <FormItem className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-3 h-12 bg-card/50">
                     <div className="space-y-0.5">
                       <FormLabel className="text-sm font-medium">
-                        Specific Opening Hours
+                        Opening Hours
                       </FormLabel>
                     </div>
                     <FormControl>
@@ -339,20 +316,18 @@ export default function AddPage() {
                     name="openTime"
                     render={({ field }) => (
                       <FormItem className="flex-1 space-y-1">
-                        <FormLabel className="text-xs text-muted-foreground">Opens</FormLabel>
                         <FormControl>
                           <Input type="time" {...field} className="h-8 text-sm bg-transparent border-border/60" />
                         </FormControl>
                       </FormItem>
                     )}
                   />
-                  <span className="text-muted-foreground pt-4">-</span>
+                  <span className="text-muted-foreground">-</span>
                   <FormField
                     control={form.control}
                     name="closeTime"
                     render={({ field }) => (
                       <FormItem className="flex-1 space-y-1">
-                        <FormLabel className="text-xs text-muted-foreground">Closes</FormLabel>
                         <FormControl>
                           <Input type="time" {...field} className="h-8 text-sm bg-transparent border-border/60" />
                         </FormControl>
@@ -416,7 +391,7 @@ export default function AddPage() {
           )}
 
           <Button type="submit" size="lg" className="w-full h-14 text-lg rounded-xl mt-6 shadow-lg shadow-primary/20">
-            Save Details
+            Save
           </Button>
         </form>
       </Form>
