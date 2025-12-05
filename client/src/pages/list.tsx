@@ -33,7 +33,6 @@ const quickAddSchema = z.object({
   name: z.string().min(2, "Name is required"),
   type: z.enum(['home', 'out']),
   category: z.string().optional(), // For Home
-  location: z.string().optional(), // For Out - Restored
 });
 
 export default function ListPage() {
@@ -57,7 +56,6 @@ export default function ListPage() {
       name: "",
       type: "home", 
       category: "",
-      location: "",
     },
   });
 
@@ -68,18 +66,12 @@ export default function ListPage() {
       name: values.name,
       type: values.type as FoodType,
       category: values.type === 'home' ? values.category : undefined,
-      // If Out type and location provided, add it as the first location
-      locations: values.type === 'out' && values.location ? [{
-        id: Math.random().toString(36).substr(2, 9),
-        name: values.location,
-        // Default hours/closed days can be empty
-      }] : [],
+      locations: values.type === 'out' ? [] : undefined, 
     });
     form.reset({
       name: "",
       type: values.type as FoodType, 
       category: "",
-      location: "",
     });
     setIsQuickAddOpen(false);
   }
@@ -168,7 +160,7 @@ export default function ListPage() {
                     />
                   </div>
 
-                  {watchType === 'home' ? (
+                  {watchType === 'home' && (
                     <FormField
                       control={form.control}
                       name="category"
@@ -188,19 +180,6 @@ export default function ListPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ) : (
-                    <FormField
-                      control={form.control}
-                      name="location"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Input placeholder="Location" {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
-                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -280,16 +259,6 @@ export default function ListPage() {
                         <span className="truncate text-xs opacity-70 max-w-[150px]">{item.notes}</span>
                       )}
                     </div>
-                  )}
-
-                  {/* Out Details - Show Location names if any */}
-                  {item.type === 'out' && item.locations && item.locations.length > 0 && (
-                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                       <span className="flex items-center gap-1 truncate">
-                         <MapPin size={12} /> 
-                         {item.locations.map(l => l.name).join(", ")}
-                       </span>
-                     </div>
                   )}
                 </div>
               </div>
