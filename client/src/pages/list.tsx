@@ -254,7 +254,7 @@ export default function ListPage() {
             <div 
               key={item.id}
               className={cn(
-                "bg-card border border-border/50 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex gap-3 items-center group relative overflow-hidden min-h-[80px]",
+                "bg-card border border-border/50 p-4 pr-5 rounded-2xl shadow-sm hover:shadow-md transition-all flex gap-3 items-center group relative min-h-[80px]",
                 !item.status.available && "opacity-70 bg-muted/30"
               )}
             >
