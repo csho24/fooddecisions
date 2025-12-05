@@ -15,8 +15,9 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
-import { Search, ChevronDown, Home, Utensils } from "lucide-react";
+import { Search, ChevronDown, Home, Utensils, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const formSchema = z.object({
   id: z.string().optional(),
@@ -56,6 +57,7 @@ export default function AddPage() {
   const [step, setStep] = useState<'select' | 'edit'>('select');
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<'home' | 'out'>('home');
+  const [isHoursOpen, setIsHoursOpen] = useState(false);
 
   // Handle deep linking via ID
   useEffect(() => {
@@ -66,9 +68,9 @@ export default function AddPage() {
       if (found) {
         setSelectedItem(found);
         setStep('edit');
-        // Clear the ID from URL to avoid stuck state if they go back? 
-        // Actually wouter doesn't easily replace state without navigation. 
-        // It's fine, if they hit back they go to list.
+        if (found.openingHours) {
+            setIsHoursOpen(true);
+        }
       }
     }
   }, [searchString, items]);
@@ -112,8 +114,16 @@ export default function AddPage() {
         closeTime: selectedItem.openingHours?.close || "21:00",
         closedDays: selectedItem.closedDays || [],
       });
+      
+      // Sync local state
+      setIsHoursOpen(!!selectedItem.openingHours);
     }
   }, [selectedItem, form]);
+
+  // Keep hasOpeningHours in sync with isHoursOpen for logic
+  useEffect(() => {
+    form.setValue('hasOpeningHours', isHoursOpen);
+  }, [isHoursOpen, form]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (values.id) {
@@ -126,7 +136,8 @@ export default function AddPage() {
       location: values.type === 'out' ? values.location : undefined,
       category: values.type === 'home' ? values.category : undefined,
       notes: values.notes,
-      openingHours: values.hasOpeningHours && values.openTime && values.closeTime ? {
+      // Only save hours if the section is open
+      openingHours: isHoursOpen && values.openTime && values.closeTime ? {
         open: values.openTime,
         close: values.closeTime,
       } : undefined,
@@ -171,7 +182,7 @@ export default function AddPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input 
               placeholder={`Search ${activeTab}...`} 
-              className="pl-9"
+              className="pl-9 h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -236,7 +247,7 @@ export default function AddPage() {
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <Input {...field} className="bg-card" />
+                  <Input {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -252,7 +263,7 @@ export default function AddPage() {
                   <FormLabel>Category</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger className="bg-card">
+                      <SelectTrigger className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                     </FormControl>
@@ -278,7 +289,7 @@ export default function AddPage() {
                 <FormItem>
                   <FormLabel>Location</FormLabel>
                   <FormControl>
-                    <Input placeholder="Location" {...field} className="bg-card" />
+                    <Input placeholder="Location" {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -286,58 +297,56 @@ export default function AddPage() {
             />
           )}
 
+          {/* Note: Notes field was removed in previous turn per request */}
+
           {watchType === 'out' && (
             <div className="space-y-4 border-t pt-4 border-border/50">
-              <FormField
-                control={form.control}
-                name="hasOpeningHours"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-3 h-12 bg-card/50">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-sm font-medium">
-                        Opening Hours
-                      </FormLabel>
-                    </div>
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        className="h-5 w-5"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+              {/* Collapsible Opening Hours */}
+              <Collapsible 
+                open={isHoursOpen} 
+                onOpenChange={setIsHoursOpen}
+                className="border rounded-xl overflow-hidden bg-card/50"
+              >
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-accent/50 transition-colors">
+                   <div className="flex items-center gap-3">
+                     <Clock size={20} className="text-muted-foreground" />
+                     <span className="font-medium text-sm">Specific Opening Hours</span>
+                   </div>
+                   <ChevronDown size={16} className={cn("text-muted-foreground transition-transform duration-200", isHoursOpen && "rotate-180")} />
+                </CollapsibleTrigger>
+                
+                <CollapsibleContent className="p-4 pt-0 space-y-4 bg-card/30">
+                   <div className="flex gap-3 items-center pt-2">
+                    <FormField
+                      control={form.control}
+                      name="openTime"
+                      render={({ field }) => (
+                        <FormItem className="flex-1 space-y-1">
+                          <FormLabel className="text-xs text-muted-foreground">Opens</FormLabel>
+                          <FormControl>
+                            <Input type="time" {...field} className="h-10 text-sm bg-background border-border/60 rounded-lg" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <span className="text-muted-foreground pt-6">-</span>
+                    <FormField
+                      control={form.control}
+                      name="closeTime"
+                      render={({ field }) => (
+                        <FormItem className="flex-1 space-y-1">
+                          <FormLabel className="text-xs text-muted-foreground">Closes</FormLabel>
+                          <FormControl>
+                            <Input type="time" {...field} className="h-10 text-sm bg-background border-border/60 rounded-lg" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
 
-              {watchHasHours && (
-                <div className="flex gap-3 items-center bg-card/30 p-2 rounded-lg border border-dashed border-border/60">
-                  <FormField
-                    control={form.control}
-                    name="openTime"
-                    render={({ field }) => (
-                      <FormItem className="flex-1 space-y-1">
-                        <FormControl>
-                          <Input type="time" {...field} className="h-8 text-sm bg-transparent border-border/60" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <span className="text-muted-foreground">-</span>
-                  <FormField
-                    control={form.control}
-                    name="closeTime"
-                    render={({ field }) => (
-                      <FormItem className="flex-1 space-y-1">
-                        <FormControl>
-                          <Input type="time" {...field} className="h-8 text-sm bg-transparent border-border/60" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
+              <div className="space-y-2 pt-2">
                 <Label className="text-sm font-medium">Days Business is Closed</Label>
                 <div className="flex flex-wrap gap-1.5">
                   {DAYS.map((day) => (
@@ -370,7 +379,7 @@ export default function AddPage() {
                                 <Label 
                                   htmlFor={`day-${day.id}`}
                                   className={cn(
-                                    "flex items-center justify-center w-9 h-9 rounded-full border text-xs font-medium cursor-pointer transition-all",
+                                    "flex items-center justify-center w-10 h-10 rounded-full border text-sm font-medium cursor-pointer transition-all",
                                     field.value?.includes(day.id)
                                       ? "bg-destructive text-destructive-foreground border-destructive"
                                       : "bg-card hover:bg-accent border-border/60"
@@ -391,7 +400,7 @@ export default function AddPage() {
           )}
 
           <Button type="submit" size="lg" className="w-full h-14 text-lg rounded-xl mt-6 shadow-lg shadow-primary/20">
-            Save
+            Save Details
           </Button>
         </form>
       </Form>

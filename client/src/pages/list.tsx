@@ -15,16 +15,12 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from "@/component
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation } from "wouter";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -104,22 +100,6 @@ export default function ListPage() {
     }
   };
 
-  const handleEdit = (id: string) => {
-    // We can pass state via navigation, but for now let's rely on the AddPage to find it via search or selection.
-    // Actually, better to deep link. But AddPage currently uses local state. 
-    // The user request was "click on options in food list>Out, it allows me to change..."
-    // I'll implement a simple redirect to /add but ideally we'd pass the ID.
-    // For now, let's just go to /add. The user can search.
-    // Wait, user said "click on options... allows me to change".
-    // To make this smooth, I should update AddPage to accept an ID or store selection.
-    // But since I can't easily change AddPage's state from here without a global "selectedItem" store property,
-    // I will instruct the user to use the Add Info page for editing for now, 
-    // OR I can just navigate to /add and they can find it.
-    // Actually, I can use a URL parameter ?edit=ID in the future.
-    // For this iteration, let's make clicking the item navigate to /add.
-    setLocation("/add");
-  };
-
   return (
     <Layout showBack title="My Food Lists">
       {/* Quick Add Section */}
@@ -189,7 +169,7 @@ export default function ListPage() {
                       render={({ field }) => (
                         <FormItem className="flex-1">
                           <FormControl>
-                            <Input placeholder="What is it?" {...field} className="h-10" />
+                            <Input placeholder="What is it?" {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -205,7 +185,7 @@ export default function ListPage() {
                         <FormItem>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
-                              <SelectTrigger className="h-10">
+                              <SelectTrigger className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all">
                                 <SelectValue placeholder="Category" />
                               </SelectTrigger>
                             </FormControl>
@@ -228,7 +208,7 @@ export default function ListPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Location?" {...field} className="h-10" />
+                            <Input placeholder="Location?" {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -236,7 +216,7 @@ export default function ListPage() {
                     />
                   )}
 
-                  <Button type="submit" size="sm" className="w-full rounded-lg">
+                  <Button type="submit" size="sm" className="w-full h-12 rounded-xl text-base font-medium">
                     Add Item
                   </Button>
                 </form>
@@ -252,7 +232,7 @@ export default function ListPage() {
           variant={filter === 'home' ? 'default' : 'ghost'} 
           size="sm" 
           onClick={() => setFilter('home')}
-          className="rounded-lg shadow-none"
+          className="rounded-lg shadow-none h-10"
         >
           <Home size={16} className="mr-2" />
           Home
@@ -261,7 +241,7 @@ export default function ListPage() {
           variant={filter === 'out' ? 'default' : 'ghost'} 
           size="sm" 
           onClick={() => setFilter('out')}
-          className="rounded-lg shadow-none"
+          className="rounded-lg shadow-none h-10"
         >
           <Utensils size={16} className="mr-2" />
           Out
@@ -389,33 +369,31 @@ export default function ListPage() {
       </ScrollArea>
 
       {/* Eaten/Thrown Dialog */}
-      <AlertDialog open={!!itemToArchive} onOpenChange={(open) => !open && setItemToArchive(null)}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Food Item Consumed?</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={!!itemToArchive} onOpenChange={(open) => !open && setItemToArchive(null)}>
+        <DialogContent className="w-[90%] rounded-2xl p-6">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-center text-xl">Food Item Consumed?</DialogTitle>
+            <DialogDescription className="text-center">
               Did you eat this item or did it go to waste?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
-            <AlertDialogCancel className="mt-0">Cancel</AlertDialogCancel>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <AlertDialogAction 
-                className="flex-1 bg-destructive hover:bg-destructive/90 text-white"
-                onClick={() => handleArchive('thrown')}
-              >
-                Thrown
-              </AlertDialogAction>
-              <AlertDialogAction 
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => handleArchive('eaten')}
-              >
-                Eaten
-              </AlertDialogAction>
-            </div>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 w-full">
+            <Button 
+              variant="destructive"
+              className="flex-1 h-12 rounded-xl text-lg"
+              onClick={() => handleArchive('thrown')}
+            >
+              Thrown
+            </Button>
+            <Button 
+              className="flex-1 h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white text-lg"
+              onClick={() => handleArchive('eaten')}
+            >
+              Eaten
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
