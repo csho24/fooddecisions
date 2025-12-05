@@ -402,6 +402,24 @@ export default function AddPage() {
           <Button type="submit" size="lg" className="w-full h-14 text-lg rounded-xl mt-6 shadow-lg shadow-primary/20">
             Save Details
           </Button>
+
+          {selectedItem && (
+             <Button 
+               type="button" 
+               variant="ghost" 
+               size="lg" 
+               className="w-full h-12 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
+               onClick={() => {
+                 if (selectedItem.id) {
+                   removeItem(selectedItem.id);
+                   toast({ title: "Deleted", description: `${selectedItem.name} removed.` });
+                   setLocation("/list");
+                 }
+               }}
+             >
+               Delete Item
+             </Button>
+          )}
         </form>
       </Form>
     </Layout>

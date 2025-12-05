@@ -254,7 +254,7 @@ export default function ListPage() {
             <div 
               key={item.id}
               className={cn(
-                "bg-card border border-border/50 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex gap-4 items-start group relative overflow-hidden",
+                "bg-card border border-border/50 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex gap-3 items-center group relative overflow-hidden min-h-[80px]",
                 !item.status.available && "opacity-70 bg-muted/30"
               )}
             >
@@ -279,13 +279,13 @@ export default function ListPage() {
               
               {/* Clickable Area for Edit */}
               <div 
-                className="flex-1 min-w-0 cursor-pointer"
+                className="flex-1 min-w-0 cursor-pointer self-stretch flex flex-col justify-center"
                 onClick={() => {
                   setLocation(`/add?id=${item.id}`); 
                 }}
               >
                 <h3 className={cn(
-                  "font-bold text-lg leading-tight truncate",
+                  "font-bold text-lg leading-tight truncate pr-2",
                   !item.status.available && "text-muted-foreground"
                 )}>{item.name}</h3>
                 
@@ -302,13 +302,13 @@ export default function ListPage() {
                 )}
               </div>
               
-              {/* Actions */}
-              <div className="flex flex-col gap-1 items-center justify-center pl-2">
-                {item.type === 'home' ? (
+              {/* Actions - Only for Home items now */}
+              {item.type === 'home' && (
+                <div className="flex flex-col gap-1 items-center justify-center pl-1 shrink-0">
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-12 w-12 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors"
+                    className="h-12 w-12 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors active:scale-95"
                     onClick={(e) => {
                       e.stopPropagation();
                       setItemToArchive(item.id);
@@ -316,20 +316,8 @@ export default function ListPage() {
                   >
                     <Check size={24} strokeWidth={3} />
                   </Button>
-                ) : (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeItem(item.id);
-                    }}
-                  >
-                    <X size={20} />
-                  </Button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ))}
           
