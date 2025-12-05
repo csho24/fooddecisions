@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, useSearch } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -476,21 +477,18 @@ export default function AddPage() {
                 
                 {/* Notes field removed as requested */}
 
-                <Collapsible 
-                    open={isHoursOpen} 
-                    onOpenChange={setIsHoursOpen}
-                    className="border rounded-xl overflow-hidden bg-card/50"
-                >
-                    <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-accent/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                            <Clock size={20} className="text-muted-foreground" />
-                            <span className="font-medium text-sm">Specific Opening Hours</span>
-                        </div>
-                        <ChevronDown size={16} className={cn("text-muted-foreground transition-transform duration-200", isHoursOpen && "rotate-180")} />
-                    </CollapsibleTrigger>
-                    
-                    <CollapsibleContent className="p-4 pt-0 space-y-4 bg-card/30">
-                        <div className="flex gap-3 items-center pt-2">
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="has-hours" className="text-sm font-medium">Specific Opening Hours</Label>
+                    <Switch 
+                        id="has-hours"
+                        checked={isHoursOpen}
+                        onCheckedChange={setIsHoursOpen}
+                    />
+                </div>
+
+                {isHoursOpen && (
+                    <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="flex gap-3 items-center">
                             <div className="flex-1 space-y-1">
                                 <Label className="text-xs text-muted-foreground">Opens</Label>
                                 <Input 
@@ -511,38 +509,38 @@ export default function AddPage() {
                                 />
                             </div>
                         </div>
-                    </CollapsibleContent>
-                </Collapsible>
 
-                <div className="space-y-2 pt-2">
-                    <Label className="text-sm font-medium">Days Business is Closed</Label>
-                    <div className="flex flex-wrap gap-1.5">
-                        {DAYS.map((day) => {
-                            const currentClosed = locationForm.watch('closedDays') || [];
-                            const isSelected = currentClosed.includes(day.id);
-                            return (
-                                <div 
-                                    key={day.id}
-                                    onClick={() => {
-                                        if (isSelected) {
-                                            locationForm.setValue('closedDays', currentClosed.filter(d => d !== day.id));
-                                        } else {
-                                            locationForm.setValue('closedDays', [...currentClosed, day.id]);
-                                        }
-                                    }}
-                                    className={cn(
-                                        "flex items-center justify-center w-10 h-10 rounded-full border text-sm font-medium cursor-pointer transition-all select-none",
-                                        isSelected
-                                            ? "bg-destructive text-destructive-foreground border-destructive"
-                                            : "bg-card hover:bg-accent border-border/60"
-                                    )}
-                                >
-                                    {day.label.charAt(0)}
-                                </div>
-                            );
-                        })}
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium">Days Business is Closed</Label>
+                            <div className="flex flex-wrap gap-1.5">
+                                {DAYS.map((day) => {
+                                    const currentClosed = locationForm.watch('closedDays') || [];
+                                    const isSelected = currentClosed.includes(day.id);
+                                    return (
+                                        <div 
+                                            key={day.id}
+                                            onClick={() => {
+                                                if (isSelected) {
+                                                    locationForm.setValue('closedDays', currentClosed.filter(d => d !== day.id));
+                                                } else {
+                                                    locationForm.setValue('closedDays', [...currentClosed, day.id]);
+                                                }
+                                            }}
+                                            className={cn(
+                                                "flex items-center justify-center w-10 h-10 rounded-full border text-sm font-medium cursor-pointer transition-all select-none",
+                                                isSelected
+                                                    ? "bg-destructive text-destructive-foreground border-destructive"
+                                                    : "bg-card hover:bg-accent border-border/60"
+                                            )}
+                                        >
+                                            {day.label.charAt(0)}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             <DialogFooter>
