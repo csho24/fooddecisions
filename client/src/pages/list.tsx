@@ -141,10 +141,10 @@ export default function ListPage() {
           ))}
           
           {filteredItems.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
+            <div className="text-center py-12 text-muted-foreground space-y-4">
               <p>No items found in this list.</p>
-              <Button variant="link" asChild>
-                <a href="/add">Add something?</a>
+              <Button asChild className="rounded-xl">
+                <a href="/add">Add Food & Details</a>
               </Button>
             </div>
           )}

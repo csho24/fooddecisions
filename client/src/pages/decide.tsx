@@ -164,9 +164,11 @@ export default function Decide() {
                 })}
 
                 {Object.keys(groupedItems).length === 0 && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <p>No items found.</p>
-                    <Button variant="link" onClick={() => setStep('type')}>Go back</Button>
+                  <div className="text-center py-12 text-muted-foreground space-y-4">
+                    <p>No items found in this category.</p>
+                    <Button asChild className="rounded-xl">
+                      <a href="/add">Add Food & Details</a>
+                    </Button>
                   </div>
                 )}
               </div>

@@ -38,12 +38,8 @@ const DAYS = [
 ];
 
 const HOME_CATEGORIES = [
-  "Leftovers",
-  "Pantry",
-  "Frozen",
-  "Snacks",
-  "Drinks",
-  "Ingredients"
+  "Fridge",
+  "Snacks"
 ];
 
 export default function AddPage() {
