@@ -221,14 +221,6 @@ export default function AddPage() {
   return (
     <Layout showBack title="Edit Info">
       <div className="mb-6">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="-ml-2 text-muted-foreground mb-2"
-          onClick={() => setStep('select')}
-        >
-          ← Back
-        </Button>
         <h2 className="font-bold text-xl">{selectedItem?.name}</h2>
       </div>
 

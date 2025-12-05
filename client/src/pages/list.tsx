@@ -304,17 +304,17 @@ export default function ListPage() {
               
               {/* Actions - Only for Home items now */}
               {item.type === 'home' && (
-                <div className="flex flex-col gap-1 items-center justify-center pl-1 shrink-0">
+                <div className="flex flex-col gap-1 items-center justify-center shrink-0 mr-1">
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-12 w-12 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors active:scale-95"
+                    className="h-10 w-10 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors active:scale-95"
                     onClick={(e) => {
                       e.stopPropagation();
                       setItemToArchive(item.id);
                     }}
                   >
-                    <Check size={24} strokeWidth={3} />
+                    <Check size={20} strokeWidth={3} />
                   </Button>
                 </div>
               )}
