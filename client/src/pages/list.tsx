@@ -1,7 +1,7 @@
 import { Layout } from "@/components/mobile-layout";
 import { useFoodStore, FoodItem, FoodType } from "@/lib/store";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown, Check, Pencil } from "lucide-react";
+import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
@@ -301,9 +301,7 @@ export default function ListPage() {
               <div 
                 className="flex-1 min-w-0 cursor-pointer"
                 onClick={() => {
-                  // Navigate to Add Info with search params to pre-fill search? 
-                  // Or just go to Add Info page.
-                  setLocation(`/add`); 
+                  setLocation(`/add?id=${item.id}`); 
                 }}
               >
                 <h3 className={cn(
@@ -373,15 +371,6 @@ export default function ListPage() {
                     <X size={18} />
                   </Button>
                 )}
-                {/* Optional Edit Button for clarity, though row is clickable */}
-                <Button
-                   variant="ghost" 
-                   size="icon" 
-                   className="h-8 w-8 text-muted-foreground hover:text-primary -mr-2"
-                   onClick={() => setLocation('/add')}
-                >
-                  <Pencil size={16} />
-                </Button>
               </div>
             </div>
           ))}

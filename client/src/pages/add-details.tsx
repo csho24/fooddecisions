@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -50,12 +50,28 @@ export default function AddPage() {
   const { items, addItem, removeItem } = useFoodStore();
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
-  // Check if there's a selected ID from previous navigation (mock implementation using URL query would be better but trying to keep it simple without major router refactor)
-  // For now, we rely on user selecting from the list.
+  const searchString = useSearch();
+  
   const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
   const [step, setStep] = useState<'select' | 'edit'>('select');
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<'home' | 'out'>('home');
+
+  // Handle deep linking via ID
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const id = params.get('id');
+    if (id) {
+      const found = items.find(i => i.id === id);
+      if (found) {
+        setSelectedItem(found);
+        setStep('edit');
+        // Clear the ID from URL to avoid stuck state if they go back? 
+        // Actually wouter doesn't easily replace state without navigation. 
+        // It's fine, if they hit back they go to list.
+      }
+    }
+  }, [searchString, items]);
 
   // Filter items for selection
   const filteredItems = items.filter(item => 
