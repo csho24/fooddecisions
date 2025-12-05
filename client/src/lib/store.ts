@@ -9,32 +9,39 @@ export interface OpeningHours {
   close: string; // "21:00"
 }
 
+export interface LocationDetail {
+  id: string;
+  name: string; // The location name e.g. "Maxwell"
+  notes?: string;
+  openingHours?: OpeningHours;
+  closedDays?: number[]; // 0 = Sunday
+}
+
 export interface FoodItem {
   id: string;
   name: string;
   type: FoodType;
   
-  // For 'out' items
-  location?: string; 
-  
   // For 'home' items
-  category?: string; // e.g. "Fridge", "Snacks"
-
+  category?: string; 
   notes?: string;
   
-  // Constraints
-  closedDays?: number[]; // 0 = Sunday, 1 = Monday...
+  // For 'out' items - New Structure
+  locations?: LocationDetail[];
+  
+  // Legacy fields for backward compatibility/migration (optional)
+  location?: string; 
+  closedDays?: number[];
   openingHours?: OpeningHours;
-  cleaningDates?: string[]; // ISO dates "2025-05-20"
+  cleaningDates?: string[]; 
 }
 
 interface StoreState {
   items: FoodItem[];
   addItem: (item: Omit<FoodItem, 'id'>) => void;
+  updateItem: (id: string, updates: Partial<FoodItem>) => void;
   removeItem: (id: string) => void;
-  checkAvailability: (item: FoodItem) => { available: boolean; reason?: string };
-  // Future proofing for archive
-  // archiveItem: (id: string, reason: 'eaten' | 'thrown') => void;
+  checkAvailability: (item: FoodItem, locationId?: string) => { available: boolean; reason?: string };
 }
 
 export const useFoodStore = create<StoreState>()(
@@ -45,30 +52,44 @@ export const useFoodStore = create<StoreState>()(
       addItem: (item) => set((state) => ({
         items: [...state.items, { ...item, id: Math.random().toString(36).substr(2, 9) }]
       })),
+
+      updateItem: (id, updates) => set((state) => ({
+        items: state.items.map(item => item.id === id ? { ...item, ...updates } : item)
+      })),
       
       removeItem: (id) => set((state) => ({
         items: state.items.filter((i) => i.id !== id)
       })),
       
-      checkAvailability: (item: FoodItem) => {
+      checkAvailability: (item: FoodItem, locationId?: string) => {
         if (item.type === 'home') return { available: true };
+
+        // If checking a specific location
+        let targetLocation: LocationDetail | undefined;
+        if (locationId && item.locations) {
+          targetLocation = item.locations.find(l => l.id === locationId);
+        } else if (item.locations && item.locations.length > 0) {
+           // If no location specified, check if ANY location is open? 
+           // Or just return true? Let's default to true unless all are closed.
+           // For simplicity in list view, we might just say available.
+           return { available: true };
+        }
+
+        // Fallback for legacy items or single location logic
+        const closedDays = targetLocation ? targetLocation.closedDays : item.closedDays;
+        const openingHours = targetLocation ? targetLocation.openingHours : item.openingHours;
 
         const now = new Date();
         const currentDay = getDay(now);
         const currentTime = format(now, 'HH:mm');
-        const todayStr = format(now, 'yyyy-MM-dd');
-
-        if (item.cleaningDates?.includes(todayStr)) {
-          return { available: false, reason: 'Cleaning today' };
-        }
-
-        if (item.closedDays?.includes(currentDay)) {
+        
+        if (closedDays?.includes(currentDay)) {
           return { available: false, reason: 'Closed today' };
         }
         
-        if (item.openingHours) {
-          if (currentTime < item.openingHours.open || currentTime > item.openingHours.close) {
-            return { available: false, reason: `Opens ${item.openingHours.open} - ${item.openingHours.close}` };
+        if (openingHours) {
+          if (currentTime < openingHours.open || currentTime > openingHours.close) {
+            return { available: false, reason: `Opens ${openingHours.open} - ${openingHours.close}` };
           }
         }
 

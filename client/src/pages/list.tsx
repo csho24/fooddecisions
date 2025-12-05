@@ -1,7 +1,7 @@
 import { Layout } from "@/components/mobile-layout";
 import { useFoodStore, FoodItem, FoodType } from "@/lib/store";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown, Check } from "lucide-react";
+import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown, Check, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
@@ -33,7 +33,7 @@ const quickAddSchema = z.object({
   name: z.string().min(2, "Name is required"),
   type: z.enum(['home', 'out']),
   category: z.string().optional(), // For Home
-  location: z.string().optional(), // For Out
+  // Location removed from quick add for 'out' type as requested - just name first
 });
 
 export default function ListPage() {
@@ -45,13 +45,11 @@ export default function ListPage() {
 
   const filteredItems = items.filter(item => item.type === filter);
 
-  // Sort items: Available first, then Unavailable
-  const sortedItems = filteredItems.map(item => ({
-    ...item,
-    status: checkAvailability(item)
-  })).sort((a, b) => {
-    if (a.status.available === b.status.available) return 0;
-    return a.status.available ? -1 : 1;
+  // Sort items
+  const sortedItems = filteredItems.sort((a, b) => {
+    // For Home: Check availability? Home is always available.
+    // For Out: Just sort by name for now as per request to keep it simple list
+    return a.name.localeCompare(b.name);
   });
 
   // Quick Add Form
@@ -59,35 +57,24 @@ export default function ListPage() {
     resolver: zodResolver(quickAddSchema),
     defaultValues: {
       name: "",
-      type: "home", // Default to home for quick add
+      type: "home", 
       category: "",
-      location: "",
     },
   });
 
   const watchType = form.watch("type");
-
-  // Reset category/location when type changes to avoid "left behind" values
-  useEffect(() => {
-    if (watchType === 'out') {
-      form.setValue('category', '');
-    } else {
-      form.setValue('location', '');
-    }
-  }, [watchType, form]);
 
   function onQuickAdd(values: z.infer<typeof quickAddSchema>) {
     addItem({
       name: values.name,
       type: values.type as FoodType,
       category: values.type === 'home' ? values.category : undefined,
-      location: values.type === 'out' ? values.location : undefined,
+      locations: values.type === 'out' ? [] : undefined, // Initialize empty locations array
     });
     form.reset({
       name: "",
-      type: values.type as FoodType, // Keep last type
+      type: values.type as FoodType, 
       category: "",
-      location: "",
     });
     setIsQuickAddOpen(false);
   }
@@ -96,7 +83,6 @@ export default function ListPage() {
     if (itemToArchive) {
       removeItem(itemToArchive);
       setItemToArchive(null);
-      // In a real app, we would send this to an archive table with the reason
     }
   };
 
@@ -177,7 +163,7 @@ export default function ListPage() {
                     />
                   </div>
 
-                  {watchType === 'home' ? (
+                  {watchType === 'home' && (
                     <FormField
                       control={form.control}
                       name="category"
@@ -197,19 +183,6 @@ export default function ListPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ) : (
-                    <FormField
-                      control={form.control}
-                      name="location"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Input placeholder="Location?" {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
-                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -250,31 +223,26 @@ export default function ListPage() {
 
       <ScrollArea className="flex-1 -mx-4 px-4">
         <div className="space-y-3 pb-8">
-          {sortedItems.map((item) => (
+          {sortedItems.map((item) => {
+            // Only check availability for Home items in this list view logic, 
+            // or if we want to show 'available' for Out items based on at least one location being open?
+            // User asked for "Food Names" only for Out.
+            const status = checkAvailability(item);
+            
+            return (
             <div 
               key={item.id}
               className={cn(
-                "bg-card border border-border/50 p-4 pr-5 rounded-2xl shadow-sm hover:shadow-md transition-all flex gap-3 items-center group relative min-h-[80px]",
-                !item.status.available && "opacity-70 bg-muted/30"
+                "bg-card border border-border/50 p-4 pr-6 rounded-2xl shadow-sm hover:shadow-md transition-all flex gap-3 items-center group relative min-h-[80px]",
+                item.type === 'home' && !status.available && "opacity-70 bg-muted/30"
               )}
             >
-              {/* Availability Indicator Strip */}
-              {!item.status.available && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-muted-foreground/20" />
-              )}
-
               <div className={cn(
                 "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 relative",
                 item.type === 'home' ? "bg-orange-100 text-orange-600" : "bg-emerald-100 text-emerald-600",
-                !item.status.available && "grayscale opacity-50"
+                item.type === 'home' && !status.available && "grayscale opacity-50"
               )}>
                 {item.type === 'home' ? <Home size={20} /> : <Utensils size={20} />}
-                
-                {!item.status.available && (
-                  <div className="absolute -top-1 -right-1 bg-muted-foreground text-white rounded-full p-0.5 border-2 border-card">
-                    <AlertCircle size={10} />
-                  </div>
-                )}
               </div>
               
               {/* Clickable Area for Edit */}
@@ -286,7 +254,7 @@ export default function ListPage() {
               >
                 <h3 className={cn(
                   "font-bold text-lg leading-tight truncate pr-2",
-                  !item.status.available && "text-muted-foreground"
+                  item.type === 'home' && !status.available && "text-muted-foreground"
                 )}>{item.name}</h3>
                 
                 {/* Show extra details ONLY for Home items (Category) */}
@@ -300,26 +268,49 @@ export default function ListPage() {
                     )}
                   </div>
                 )}
+
+                {/* For Out items, show location count if multiple */}
+                {item.type === 'out' && item.locations && item.locations.length > 0 && (
+                   <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                     <span className="flex items-center gap-1">
+                       <MapPin size={12} /> {item.locations.length} Location{item.locations.length !== 1 ? 's' : ''}
+                     </span>
+                   </div>
+                )}
               </div>
               
               {/* Actions - Only for Home items now */}
               {item.type === 'home' && (
-                <div className="flex flex-col gap-1 items-center justify-center shrink-0 mr-1">
+                <div className="flex flex-col gap-1 items-center justify-center shrink-0 -mr-2">
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-10 w-10 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors active:scale-95"
+                    className="h-12 w-12 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors active:scale-95"
                     onClick={(e) => {
                       e.stopPropagation();
                       setItemToArchive(item.id);
                     }}
                   >
-                    <Check size={20} strokeWidth={3} />
+                    <Check size={24} strokeWidth={3} />
                   </Button>
                 </div>
               )}
+              
+              {/* For Out items, show a chevron to indicate drill-down */}
+              {item.type === 'out' && (
+                 <div className="flex flex-col gap-1 items-center justify-center shrink-0 -mr-2">
+                   <Button 
+                     variant="ghost" 
+                     size="icon" 
+                     className="h-12 w-12 text-muted-foreground/50"
+                     onClick={() => setLocation(`/add?id=${item.id}`)}
+                   >
+                     <ChevronRight size={24} />
+                   </Button>
+                 </div>
+              )}
             </div>
-          ))}
+          )})}
           
           {filteredItems.length === 0 && (
             <div className="text-center py-12 text-muted-foreground space-y-4">
