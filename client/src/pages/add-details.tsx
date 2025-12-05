@@ -315,59 +315,56 @@ export default function AddPage() {
                 control={form.control}
                 name="hasOpeningHours"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-card">
+                  <FormItem className="flex flex-row items-center justify-between space-y-0 rounded-lg border p-3 h-12 bg-card/50">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-sm font-medium">
+                        Specific Opening Hours
+                      </FormLabel>
+                    </div>
                     <FormControl>
                       <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        className="h-5 w-5"
                       />
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        Specific Opening Hours
-                      </FormLabel>
-                      <FormDescription>
-                        Does this place close at a specific time?
-                      </FormDescription>
-                    </div>
                   </FormItem>
                 )}
               />
 
               {watchHasHours && (
-                <div className="flex gap-4">
+                <div className="flex gap-3 items-center bg-card/30 p-2 rounded-lg border border-dashed border-border/60">
                   <FormField
                     control={form.control}
                     name="openTime"
                     render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Opens</FormLabel>
+                      <FormItem className="flex-1 space-y-1">
+                        <FormLabel className="text-xs text-muted-foreground">Opens</FormLabel>
                         <FormControl>
-                          <Input type="time" {...field} className="bg-card" />
+                          <Input type="time" {...field} className="h-8 text-sm bg-transparent border-border/60" />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
+                  <span className="text-muted-foreground pt-4">-</span>
                   <FormField
                     control={form.control}
                     name="closeTime"
                     render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Closes</FormLabel>
+                      <FormItem className="flex-1 space-y-1">
+                        <FormLabel className="text-xs text-muted-foreground">Closes</FormLabel>
                         <FormControl>
-                          <Input type="time" {...field} className="bg-card" />
+                          <Input type="time" {...field} className="h-8 text-sm bg-transparent border-border/60" />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
               )}
 
-              <div className="space-y-3">
-                <Label>Closed Days</Label>
-                <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Closed Days</Label>
+                <div className="flex flex-wrap gap-1.5">
                   {DAYS.map((day) => (
                     <FormField
                       key={day.id}
@@ -377,7 +374,7 @@ export default function AddPage() {
                         return (
                           <FormItem
                             key={day.id}
-                            className="flex flex-row items-start space-x-3 space-y-0"
+                            className="flex flex-row items-start space-x-0 space-y-0"
                           >
                             <FormControl>
                               <div className="relative">
@@ -398,10 +395,10 @@ export default function AddPage() {
                                 <Label 
                                   htmlFor={`day-${day.id}`}
                                   className={cn(
-                                    "flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer transition-all",
+                                    "flex items-center justify-center w-9 h-9 rounded-full border text-xs font-medium cursor-pointer transition-all",
                                     field.value?.includes(day.id)
                                       ? "bg-destructive text-destructive-foreground border-destructive"
-                                      : "bg-card hover:bg-accent"
+                                      : "bg-card hover:bg-accent border-border/60"
                                   )}
                                 >
                                   {day.label.charAt(0)}
@@ -414,7 +411,6 @@ export default function AddPage() {
                     />
                   ))}
                 </div>
-                <FormDescription>Select days when this place is CLOSED.</FormDescription>
               </div>
             </div>
           )}
