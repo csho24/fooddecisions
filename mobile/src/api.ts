@@ -1,8 +1,7 @@
+import Constants from 'expo-constants';
 import { FoodItem } from './types';
 
-const API_URL = __DEV__ 
-  ? 'https://food-faster.replit.app' 
-  : 'https://food-faster.replit.app';
+const API_URL = Constants.expoConfig?.extra?.apiBaseUrl || 'https://your-app-name.replit.app';
 
 export async function getFoods(): Promise<FoodItem[]> {
   const response = await fetch(`${API_URL}/api/foods`);
