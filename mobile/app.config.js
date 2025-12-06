@@ -6,7 +6,6 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
-    newArchEnabled: true,
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
@@ -19,8 +18,7 @@ export default {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
-      },
-      edgeToEdgeEnabled: true
+      }
     },
     web: {
       favicon: "./assets/favicon.png"
