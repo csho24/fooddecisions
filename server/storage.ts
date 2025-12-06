@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { type User, type InsertUser, type FoodItem, type InsertFoodItem, type UpdateFoodItem, foodItems } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { db } from "@db";
+import { db } from "./db";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;

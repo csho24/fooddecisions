@@ -8,6 +8,8 @@ import Home from "@/pages/home";
 import Decide from "@/pages/decide";
 import ListPage from "@/pages/list";
 import AddPage from "@/pages/add-details";
+import { useEffect } from "react";
+import { useFoodStore } from "@/lib/store";
 
 function Router() {
   return (
@@ -22,6 +24,12 @@ function Router() {
 }
 
 function App() {
+  const fetchItems = useFoodStore((state) => state.fetchItems);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

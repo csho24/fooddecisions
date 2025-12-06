@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { getDay, format } from 'date-fns';
+import { getFoods, createFood, updateFood, deleteFood } from './api';
 
 export type FoodType = 'home' | 'out';
 
@@ -38,28 +38,62 @@ export interface FoodItem {
 
 interface StoreState {
   items: FoodItem[];
-  addItem: (item: Omit<FoodItem, 'id'>) => void;
-  updateItem: (id: string, updates: Partial<FoodItem>) => void;
-  removeItem: (id: string) => void;
+  isLoading: boolean;
+  fetchItems: () => Promise<void>;
+  addItem: (item: Omit<FoodItem, 'id'>) => Promise<void>;
+  updateItem: (id: string, updates: Partial<FoodItem>) => Promise<void>;
+  removeItem: (id: string) => Promise<void>;
   checkAvailability: (item: FoodItem, locationId?: string) => { available: boolean; reason?: string };
 }
 
-export const useFoodStore = create<StoreState>()(
-  persist(
-    (set, get) => ({
-      items: [], 
-      
-      addItem: (item) => set((state) => ({
-        items: [...state.items, { ...item, id: Math.random().toString(36).substr(2, 9) }]
-      })),
+export const useFoodStore = create<StoreState>()((set, get) => ({
+  items: [],
+  isLoading: false,
 
-      updateItem: (id, updates) => set((state) => ({
-        items: state.items.map(item => item.id === id ? { ...item, ...updates } : item)
-      })),
-      
-      removeItem: (id) => set((state) => ({
-        items: state.items.filter((i) => i.id !== id)
-      })),
+  fetchItems: async () => {
+    set({ isLoading: true });
+    try {
+      const items = await getFoods();
+      set({ items, isLoading: false });
+    } catch (error) {
+      console.error("Failed to fetch items:", error);
+      set({ isLoading: false });
+    }
+  },
+
+  addItem: async (item) => {
+    try {
+      const newItem = await createFood(item);
+      set((state) => ({ items: [...state.items, newItem] }));
+    } catch (error) {
+      console.error("Failed to add item:", error);
+      throw error;
+    }
+  },
+
+  updateItem: async (id, updates) => {
+    try {
+      const updatedItem = await updateFood(id, updates);
+      set((state) => ({
+        items: state.items.map((item) => (item.id === id ? updatedItem : item)),
+      }));
+    } catch (error) {
+      console.error("Failed to update item:", error);
+      throw error;
+    }
+  },
+
+  removeItem: async (id) => {
+    try {
+      await deleteFood(id);
+      set((state) => ({
+        items: state.items.filter((i) => i.id !== id),
+      }));
+    } catch (error) {
+      console.error("Failed to remove item:", error);
+      throw error;
+    }
+  },
       
       checkAvailability: (item: FoodItem, locationId?: string) => {
         if (item.type === 'home') return { available: true };
@@ -95,10 +129,4 @@ export const useFoodStore = create<StoreState>()(
 
         return { available: true };
       }
-    }),
-    {
-      name: 'food-storage',
-      storage: createJSONStorage(() => localStorage),
-    }
-  )
-);
+}));
