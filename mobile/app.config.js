@@ -28,7 +28,7 @@ module.exports = {
       "expo-font"
     ],
     extra: {
-      apiBaseUrl: process.env.API_BASE_URL || "https://food-compass--lookinsideyou.replit.app"
+      apiBaseUrl: process.env.API_BASE_URL || "https://fooddecisions.onrender.com"
     }
   }
 };
