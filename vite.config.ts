@@ -2,26 +2,45 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { metaImagesPlugin } from "./vite-plugin-meta-images";
 
-export default defineConfig({
+// Conditionally import Replit plugins only in development/Replit environment
+const getReplitPlugins = async () => {
+  const plugins = [];
+  
+  // Only use Replit plugins in development and when REPL_ID is set
+  if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
+    try {
+      const runtimeErrorOverlay = await import("@replit/vite-plugin-runtime-error-modal");
+      plugins.push(runtimeErrorOverlay.default());
+    } catch (e) {
+      // Plugin not available, skip it
+    }
+    
+    try {
+      const cartographer = await import("@replit/vite-plugin-cartographer");
+      plugins.push(cartographer.cartographer());
+    } catch (e) {
+      // Plugin not available, skip it
+    }
+    
+    try {
+      const devBanner = await import("@replit/vite-plugin-dev-banner");
+      plugins.push(devBanner.devBanner());
+    } catch (e) {
+      // Plugin not available, skip it
+    }
+  }
+  
+  return plugins;
+};
+
+export default defineConfig(async () => ({
   plugins: [
     react(),
-    runtimeErrorOverlay(),
     tailwindcss(),
     metaImagesPlugin(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
+    ...(await getReplitPlugins()),
   ],
   resolve: {
     alias: {
@@ -48,4 +67,4 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
-});
+}));
