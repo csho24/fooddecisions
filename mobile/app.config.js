@@ -1,7 +1,7 @@
-export default {
+module.exports = {
   expo: {
-    name: "Food Faster",
-    slug: "food-faster",
+    name: "Food Decisions",
+    slug: "foodecisions",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -23,8 +23,12 @@ export default {
     web: {
       favicon: "./assets/favicon.png"
     },
+    plugins: [
+      "expo-asset",
+      "expo-font"
+    ],
     extra: {
-      apiBaseUrl: process.env.API_BASE_URL || "https://your-app-name.replit.app"
+      apiBaseUrl: process.env.API_BASE_URL || "https://food-compass--lookinsideyou.replit.app"
     }
   }
 };

@@ -1,4 +1,4 @@
-# Food Faster
+# Food Decisions
 
 Speed-focused food decision-making app with native mobile support via Expo React Native.
 
