@@ -10,7 +10,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Food Faster</Text>
+        <Text style={styles.title}>Food Decisions</Text>
         <Text style={styles.subtitle}>What do you want to eat?</Text>
       </View>
 
