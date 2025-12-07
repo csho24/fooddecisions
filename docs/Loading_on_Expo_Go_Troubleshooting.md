@@ -1,7 +1,7 @@
 # Loading on Expo Go - Troubleshooting Log - December 6, 2024
 
 ## Initial Condition
-**Date:** December 6, 2024  
+**Date:** December 6, 2024 (Dec 6)  
 **Issue:** Expo mobile app showing only splash screen, unable to preview on phone  
 **Context:** This was approximately the 16th attempt (10 previous attempts with Replit, 6 with current troubleshooting session)
 
@@ -269,4 +269,48 @@ import 'react-native-screens/native-screens';
 - All packages compatible with SDK 54
 
 **Status:** ✅ App loads and displays correctly on mobile device
+
+---
+
+## Update: December 7, 2024 - Remote Update Error Fix
+
+**Date:** December 7, 2024 (Dec 7)  
+**Issue:** "Uncaught error java exception failed to download remote update"  
+**Platform:** Android (Expo Go)
+
+### Problem Identified:
+Expo Go was attempting to check for and download remote OTA (Over-The-Air) updates, which caused a Java exception on Android devices. This is unnecessary for Expo Go development since it loads directly from the dev server.
+
+### Fix Applied:
+**Removed updates configuration from `app.config.js`**
+
+Expo Go doesn't use OTA updates - it loads directly from the Metro bundler. The updates configuration was causing Expo to attempt remote update checks that failed.
+
+**Before:**
+```javascript
+// Had updates config (even with enabled: false, it still tried to check)
+updates: {
+  enabled: false
+}
+```
+
+**After:**
+```javascript
+// Removed updates config entirely - not needed for Expo Go
+// No updates section in app.config.js
+```
+
+### Additional Steps Taken:
+1. Cleared Expo cache: `rm -rf .expo node_modules/.cache`
+2. Restarted Expo with clean cache: `npx expo start --clear`
+
+### Result:
+✅ **FIXED** - App now loads without update errors. The Java exception no longer occurs.
+
+### Key Lesson:
+- **Expo Go doesn't need updates configuration** - It loads directly from the dev server
+- **Remove updates config for Expo Go development** - Only needed for standalone builds with EAS Updates
+- **Clear cache when config changes** - Helps ensure old cached update checks don't persist
+
+**Status:** ✅ App loads correctly without update errors
 
