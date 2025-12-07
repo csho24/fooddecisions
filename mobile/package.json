@@ -4,6 +4,8 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
+    "start:clean": "expo start --clear",
+    "start:fresh": "rm -rf .expo node_modules/.cache && expo start --clear",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"

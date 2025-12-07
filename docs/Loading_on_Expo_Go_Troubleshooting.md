@@ -314,3 +314,55 @@ updates: {
 
 **Status:** ✅ App loads correctly without update errors
 
+---
+
+## Update: December 7, 2024 - Reliability Improvements
+
+**Date:** December 7, 2024 (Dec 7)  
+**Issue:** Expo Go app unreliable - working "half the time"  
+**Solution:** Added safeguards and improved startup scripts
+
+### Changes Made:
+
+1. **Added prominent warning comment to `app.config.js`**
+   - Explains why `updates` config must NOT be added
+   - Visible at top of file to prevent accidental re-addition
+   - Includes inline comment where config would go
+
+2. **Improved startup scripts in `package.json`**
+   - `npm run start:clean` - Starts with cleared Metro cache
+   - `npm run start:fresh` - **RECOMMENDED** - Clears all caches (.expo, node_modules/.cache) and starts fresh
+   - More reliable than standard `npm start`
+
+3. **Updated `.gitignore`**
+   - Added `node_modules/.cache` to prevent cache files from being committed
+   - Prevents stale cache issues across different environments
+
+4. **Created `EXPO_GO_STARTUP.md` guide**
+   - Quick reference for reliable startup
+   - Troubleshooting steps for common issues
+   - Clear instructions for when app won't load
+
+### Best Practice for Reliable Startup:
+
+**Always use:**
+```bash
+cd mobile
+npm run start:fresh
+```
+
+This ensures:
+- All caches cleared (`.expo` and `node_modules/.cache`)
+- Fresh Metro bundler start
+- No stale configuration issues
+
+### If App Still Won't Load:
+
+1. Verify `app.config.js` has NO `updates` section
+2. Clear Expo Go cache on phone (Settings → Apps → Expo Go → Clear Cache)
+3. Run `npm run start:fresh`
+4. Close and reopen Expo Go app
+5. Scan QR code again
+
+**Status:** ✅ Reliability improvements implemented - use `npm run start:fresh` for most reliable startup
+
