@@ -32,6 +32,12 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Health check endpoint - register early so it's available during startup
+// This helps prevent 503 errors during cold starts
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -78,11 +84,6 @@ app.use((req, res, next) => {
 
     res.status(status).json({ message });
     throw err;
-  });
-
-  // Health check endpoint - register right before static serving
-  app.get("/health", (_req, res) => {
-    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
   // importantly only setup vite in development and after
