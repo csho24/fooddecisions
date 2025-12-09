@@ -14,7 +14,8 @@ export async function registerRoutes(
       const items = await storage.getFoodItems();
       res.json(items);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch food items" });
+      console.error("Error fetching food items:", error);
+      res.status(500).json({ error: "Failed to fetch food items", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -42,7 +43,8 @@ export async function registerRoutes(
       const item = await storage.createFoodItem(validation.data);
       res.status(201).json(item);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create food item" });
+      console.error("Error creating food item:", error);
+      res.status(500).json({ error: "Failed to create food item", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
