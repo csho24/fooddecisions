@@ -42,7 +42,6 @@ const formSchema = z.object({
   name: z.string().min(2, "Name is required"),
   type: z.enum(['home', 'out']),
   category: z.string().optional(),
-  notes: z.string().optional(),
 });
 
 const locationSchema = z.object({
@@ -114,7 +113,6 @@ export default function AddPage() {
       name: "",
       type: "out",
       category: "",
-      notes: "",
     },
   });
 
@@ -140,7 +138,6 @@ export default function AddPage() {
         name: selectedItem.name,
         type: selectedItem.type,
         category: selectedItem.category || "",
-        notes: selectedItem.notes || "",
       });
     }
   }, [selectedItem, form]);
@@ -150,7 +147,6 @@ export default function AddPage() {
       updateItem(selectedItem.id, {
         name: values.name,
         category: values.type === 'home' ? values.category : undefined,
-        notes: values.notes,
       });
       toast({ title: "Updated!", description: "Item details saved." });
     } else {
@@ -159,7 +155,6 @@ export default function AddPage() {
             name: values.name,
             type: values.type as FoodType,
             category: values.category,
-            notes: values.notes,
             locations: [],
         });
         toast({ title: "Created!", description: "New item added." });
@@ -363,18 +358,6 @@ export default function AddPage() {
                     <FormMessage />
                     </FormItem>
                 )}
-                />
-                <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                        <Textarea {...field} className="bg-muted/30 border-transparent" placeholder="Any notes?" />
-                        </FormControl>
-                    </FormItem>
-                    )}
                 />
             </>
           )}

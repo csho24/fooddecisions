@@ -1,7 +1,7 @@
 import { Layout } from "@/components/mobile-layout";
 import { useFoodStore, FoodItem, FoodType } from "@/lib/store";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown, Check, ChevronRight } from "lucide-react";
+import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown, Check, ChevronRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -36,13 +37,16 @@ const quickAddSchema = z.object({
 });
 
 export default function ListPage() {
-  const { items, removeItem, checkAvailability, addItem } = useFoodStore();
+  const { items, archivedItems, removeItem, checkAvailability, addItem, archiveItem } = useFoodStore();
   const [filter, setFilter] = useState<'home' | 'out'>('home');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [_, setLocation] = useLocation();
   const [itemToArchive, setItemToArchive] = useState<string | null>(null);
+  const [showArchive, setShowArchive] = useState(false);
 
   const filteredItems = items.filter(item => item.type === filter);
+  // Show all archived items (they're already removed from active items when archived)
+  const filteredArchivedItems = archivedItems;
 
   // Sort items
   const sortedItems = filteredItems.sort((a, b) => {
@@ -76,10 +80,14 @@ export default function ListPage() {
     setIsQuickAddOpen(false);
   }
 
-  const handleArchive = (reason: 'eaten' | 'thrown') => {
+  const handleArchive = async (reason: 'eaten' | 'thrown') => {
     if (itemToArchive) {
-      removeItem(itemToArchive);
-      setItemToArchive(null);
+      try {
+        await archiveItem(itemToArchive, reason);
+        setItemToArchive(null);
+      } catch (error) {
+        console.error("Failed to archive item:", error);
+      }
     }
   };
 
@@ -266,17 +274,15 @@ export default function ListPage() {
               {/* ABSOLUTE POSITIONED ACTION BUTTON - Guaranteed not to be cut off */}
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center z-10">
                 {item.type === 'home' ? (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-12 w-12 rounded-full bg-green-100 text-green-700 hover:bg-green-200 hover:text-green-800 transition-colors active:scale-95 shadow-sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setItemToArchive(item.id);
+                  <Checkbox
+                    className="h-6 w-6 border-2 border-primary data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setItemToArchive(item.id);
+                      }
                     }}
-                  >
-                    <Check size={24} strokeWidth={3} />
-                  </Button>
+                    onClick={(e) => e.stopPropagation()}
+                  />
                 ) : (
                    <Button 
                      variant="ghost" 
@@ -303,6 +309,62 @@ export default function ListPage() {
           )}
         </div>
       </ScrollArea>
+
+      {/* Archive Section */}
+      {filter === 'home' && filteredArchivedItems.length > 0 && (
+        <div className="mt-6 border-t border-border/50 pt-4">
+          <Collapsible open={showArchive} onOpenChange={setShowArchive}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-between mb-3">
+                <span className="font-medium">Archive ({filteredArchivedItems.length})</span>
+                <ChevronDown className={cn("transition-transform", showArchive && "rotate-180")} size={16} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-2">
+                {filteredArchivedItems.map((archivedItem) => (
+                  <div
+                    key={archivedItem.id}
+                    className={cn(
+                      "bg-card border rounded-xl p-3 flex items-center gap-3",
+                      archivedItem.status === 'thrown' && "border-red-200 bg-red-50/50",
+                      archivedItem.status === 'eaten' && "border-green-200 bg-green-50/50"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      archivedItem.status === 'thrown' && "bg-red-500",
+                      archivedItem.status === 'eaten' && "bg-green-500"
+                    )} />
+                    <div className="flex-1">
+                      <p className={cn(
+                        "font-medium text-sm",
+                        archivedItem.status === 'thrown' && "text-red-700",
+                        archivedItem.status === 'eaten' && "text-green-700"
+                      )}>
+                        {archivedItem.name}
+                      </p>
+                      {archivedItem.category && (
+                        <p className="text-xs text-muted-foreground">{archivedItem.category}</p>
+                      )}
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs",
+                        archivedItem.status === 'thrown' && "border-red-300 text-red-700",
+                        archivedItem.status === 'eaten' && "border-green-300 text-green-700"
+                      )}
+                    >
+                      {archivedItem.status === 'thrown' ? 'Thrown' : 'Eaten'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      )}
 
       {/* Eaten/Thrown Dialog */}
       <Dialog open={!!itemToArchive} onOpenChange={(open) => !open && setItemToArchive(null)}>

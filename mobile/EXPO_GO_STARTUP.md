@@ -60,3 +60,7 @@ Delete it immediately. See the comment at the top of `app.config.js` for why.
 ## Why This Matters
 
 Expo Go loads directly from your dev server. It doesn't need or want OTA updates. Having update configs causes it to try checking for remote updates, which fails and breaks the app.
+
+
+
+

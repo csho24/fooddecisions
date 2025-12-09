@@ -36,18 +36,50 @@ export interface FoodItem {
   cleaningDates?: string[]; 
 }
 
+export interface ArchivedItem {
+  id: string;
+  itemId: string;
+  name: string;
+  category?: string;
+  status: 'eaten' | 'thrown';
+  archivedAt: string;
+}
+
 interface StoreState {
   items: FoodItem[];
+  archivedItems: ArchivedItem[];
   isLoading: boolean;
   fetchItems: () => Promise<void>;
   addItem: (item: Omit<FoodItem, 'id'>) => Promise<void>;
   updateItem: (id: string, updates: Partial<FoodItem>) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
+  archiveItem: (id: string, status: 'eaten' | 'thrown') => Promise<void>;
   checkAvailability: (item: FoodItem, locationId?: string) => { available: boolean; reason?: string };
 }
 
+// Load archived items from localStorage
+const loadArchivedItems = (): ArchivedItem[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem('food-archived-items');
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveArchivedItems = (items: ArchivedItem[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('food-archived-items', JSON.stringify(items));
+  } catch (error) {
+    console.error('Failed to save archived items:', error);
+  }
+};
+
 export const useFoodStore = create<StoreState>()((set, get) => ({
   items: [],
+  archivedItems: loadArchivedItems(),
   isLoading: false,
 
   fetchItems: async () => {
@@ -91,6 +123,38 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
       }));
     } catch (error) {
       console.error("Failed to remove item:", error);
+      throw error;
+    }
+  },
+
+  archiveItem: async (id, status) => {
+    try {
+      const state = get();
+      const item = state.items.find((i) => i.id === id);
+      if (!item) return;
+
+      // Create archived item
+      const archivedItem: ArchivedItem = {
+        id: `archived-${Date.now()}-${id}`,
+        itemId: id,
+        name: item.name,
+        category: item.category,
+        status,
+        archivedAt: new Date().toISOString(),
+      };
+
+      // Add to archived items
+      const newArchivedItems = [...state.archivedItems, archivedItem];
+      saveArchivedItems(newArchivedItems);
+
+      // Remove from active items
+      await deleteFood(id);
+      set({
+        items: state.items.filter((i) => i.id !== id),
+        archivedItems: newArchivedItems,
+      });
+    } catch (error) {
+      console.error("Failed to archive item:", error);
       throw error;
     }
   },
