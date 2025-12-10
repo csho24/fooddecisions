@@ -402,7 +402,7 @@ export default function AddPage() {
             Save Changes
           </Button>
 
-          {selectedItem && (
+          {selectedItem && selectedItem.type === 'out' && (
              <Button 
                type="button" 
                variant="ghost" 

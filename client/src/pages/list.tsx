@@ -275,12 +275,16 @@ export default function ListPage() {
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center z-10">
                 {item.type === 'home' ? (
                   <Checkbox
-                    className="h-6 w-6 border-2 border-primary data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    className="h-8 w-8 border-2 border-primary data-[state=checked]:bg-primary data-[state=checked]:border-primary cursor-pointer"
                     onCheckedChange={(checked) => {
                       if (checked) {
                         setItemToArchive(item.id);
+                      } else {
+                        // Uncheck if clicked again
+                        setItemToArchive(null);
                       }
                     }}
+                    checked={itemToArchive === item.id}
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
@@ -288,7 +292,10 @@ export default function ListPage() {
                      variant="ghost" 
                      size="icon" 
                      className="h-12 w-12 text-muted-foreground/50 hover:text-foreground"
-                     onClick={() => setLocation(`/add?id=${item.id}`)}
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       setLocation(`/add?id=${item.id}`);
+                     }}
                    >
                      <ChevronRight size={24} />
                    </Button>
