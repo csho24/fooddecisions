@@ -36,9 +36,14 @@ app.use(express.urlencoded({ extended: false }));
 // Health check endpoint - register early so it's available during startup
 // This helps prevent 503 errors during cold starts
 app.get("/health", (_req, res) => {
-  const timestamp = new Date().toISOString();
-  log(`Health check requested - responding with OK`);
-  res.status(200).json({ status: "ok", timestamp });
+  try {
+    const timestamp = new Date().toISOString();
+    log(`Health check requested - responding with OK`);
+    res.status(200).json({ status: "ok", timestamp });
+  } catch (error) {
+    log(`Health check error: ${error instanceof Error ? error.message : String(error)}`, "error");
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  }
 });
 
 export function log(message: string, source = "express") {
@@ -99,7 +104,7 @@ httpServer.on("error", (err: NodeJS.ErrnoException) => {
   process.exit(1);
 });
 
-// Add global error handlers to prevent crashes
+// Add global error handlers to prevent crashes but log them
 process.on("uncaughtException", (err) => {
   log(`Uncaught Exception: ${err.message}`, "error");
   log(err.stack || "", "error");
@@ -113,13 +118,16 @@ process.on("unhandledRejection", (reason, promise) => {
 
 (async () => {
   try {
+    // Register routes - this should always succeed even if database is down
+    // Routes will return errors if database fails, but they'll be registered
     await registerRoutes(httpServer, app);
+    log("Routes registered successfully");
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
 
-      log(`Error ${status}: ${message}`, "error");
+      log(`Request Error ${status}: ${message}`, "error");
       res.status(status).json({ message });
       // Don't throw - just log the error to prevent crashes
     });
@@ -129,17 +137,26 @@ process.on("unhandledRejection", (reason, promise) => {
     // doesn't interfere with the other routes
     if (process.env.NODE_ENV === "production") {
       serveStatic(app);
+      log("Static files serving configured");
     } else {
       const { setupVite } = await import("./vite");
       await setupVite(httpServer, app);
+      log("Vite dev server configured");
     }
 
     // Server is already listening (started earlier for health endpoint)
     // Other routes and static serving are now set up
-    log("Server initialization complete");
+    log("Server initialization complete - all systems ready");
   } catch (error) {
     log(`Failed to initialize server: ${error instanceof Error ? error.message : String(error)}`, "error");
     log(error instanceof Error ? error.stack || "" : "", "error");
+    // Still register routes even if static serving fails
+    try {
+      await registerRoutes(httpServer, app);
+      log("Routes registered after initial failure");
+    } catch (routeError) {
+      log(`Failed to register routes: ${routeError instanceof Error ? routeError.message : String(routeError)}`, "error");
+    }
     // Don't exit - health endpoint should still work even if other routes fail
   }
 })();

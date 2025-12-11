@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { getDay, format } from 'date-fns';
-import { getFoods, createFood, updateFood, deleteFood } from './api';
+import { getFoods, createFood, updateFood, deleteFood, getArchives, createArchive } from './api';
 
 export type FoodType = 'home' | 'out';
 
@@ -50,6 +50,7 @@ interface StoreState {
   archivedItems: ArchivedItem[];
   isLoading: boolean;
   fetchItems: () => Promise<void>;
+  fetchArchives: () => Promise<void>;
   addItem: (item: Omit<FoodItem, 'id'>) => Promise<void>;
   updateItem: (id: string, updates: Partial<FoodItem>) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
@@ -57,29 +58,9 @@ interface StoreState {
   checkAvailability: (item: FoodItem, locationId?: string) => { available: boolean; reason?: string };
 }
 
-// Load archived items from localStorage
-const loadArchivedItems = (): ArchivedItem[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem('food-archived-items');
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveArchivedItems = (items: ArchivedItem[]) => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem('food-archived-items', JSON.stringify(items));
-  } catch (error) {
-    console.error('Failed to save archived items:', error);
-  }
-};
-
 export const useFoodStore = create<StoreState>()((set, get) => ({
   items: [],
-  archivedItems: loadArchivedItems(),
+  archivedItems: [],
   isLoading: false,
 
   fetchItems: async () => {
@@ -90,6 +71,18 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
     } catch (error) {
       console.error("Failed to fetch items:", error);
       set({ isLoading: false });
+    }
+  },
+
+  fetchArchives: async () => {
+    try {
+      const archivedItems = await getArchives();
+      console.log(`Fetched ${archivedItems.length} archived items`);
+      set({ archivedItems });
+    } catch (error) {
+      console.error("Failed to fetch archives:", error);
+      // Set empty array on error so UI doesn't show stale data
+      set({ archivedItems: [] });
     }
   },
 
@@ -133,25 +126,22 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
       const item = state.items.find((i) => i.id === id);
       if (!item) return;
 
-      // Create archived item
-      const archivedItem: ArchivedItem = {
-        id: `archived-${Date.now()}-${id}`,
+      // Create archived item in database
+      const archivedItem = await createArchive({
         itemId: id,
         name: item.name,
         category: item.category,
         status,
         archivedAt: new Date().toISOString(),
-      };
-
-      // Add to archived items
-      const newArchivedItems = [...state.archivedItems, archivedItem];
-      saveArchivedItems(newArchivedItems);
+      });
 
       // Remove from active items
       await deleteFood(id);
+      
+      // Update state
       set({
         items: state.items.filter((i) => i.id !== id),
-        archivedItems: newArchivedItems,
+        archivedItems: [...state.archivedItems, archivedItem],
       });
     } catch (error) {
       console.error("Failed to archive item:", error);
