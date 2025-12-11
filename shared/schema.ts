@@ -56,3 +56,19 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export const archivedItems = pgTable("archived_items", {
+  id: serial("id").primaryKey(),
+  itemId: text("item_id").notNull(), // Reference to original food item id
+  name: text("name").notNull(),
+  category: text("category"),
+  status: text("status").notNull(), // 'eaten' | 'thrown'
+  archivedAt: text("archived_at").notNull(), // ISO string
+});
+
+export const insertArchivedItemSchema = createInsertSchema(archivedItems, {
+  status: z.enum(['eaten', 'thrown']),
+}).omit({ id: true });
+
+export type InsertArchivedItem = z.infer<typeof insertArchivedItemSchema>;
+export type ArchivedItem = typeof archivedItems.$inferSelect;

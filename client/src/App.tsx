@@ -25,10 +25,12 @@ function Router() {
 
 function App() {
   const fetchItems = useFoodStore((state) => state.fetchItems);
+  const fetchArchives = useFoodStore((state) => state.fetchArchives);
 
   useEffect(() => {
     fetchItems();
-  }, [fetchItems]);
+    fetchArchives();
+  }, [fetchItems, fetchArchives]);
 
   return (
     <QueryClientProvider client={queryClient}>

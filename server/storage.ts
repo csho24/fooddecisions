@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { type User, type InsertUser, type FoodItem, type InsertFoodItem, type UpdateFoodItem, foodItems } from "@shared/schema";
+import { type User, type InsertUser, type FoodItem, type InsertFoodItem, type UpdateFoodItem, type ArchivedItem, type InsertArchivedItem, foodItems, archivedItems } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 
@@ -13,6 +13,9 @@ export interface IStorage {
   createFoodItem(item: InsertFoodItem): Promise<FoodItem>;
   updateFoodItem(id: number, updates: UpdateFoodItem): Promise<FoodItem | undefined>;
   deleteFoodItem(id: number): Promise<void>;
+  
+  getArchivedItems(): Promise<ArchivedItem[]>;
+  createArchivedItem(item: InsertArchivedItem): Promise<ArchivedItem>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -52,6 +55,15 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFoodItem(id: number): Promise<void> {
     await db.delete(foodItems).where(eq(foodItems.id, id));
+  }
+
+  async getArchivedItems(): Promise<ArchivedItem[]> {
+    return await db.select().from(archivedItems);
+  }
+
+  async createArchivedItem(item: InsertArchivedItem): Promise<ArchivedItem> {
+    const results = await db.insert(archivedItems).values(item).returning();
+    return results[0];
   }
 }
 

@@ -76,13 +76,19 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
 
   fetchArchives: async () => {
     try {
+      console.log("Fetching archived items from database...");
       const archivedItems = await getArchives();
-      console.log(`Fetched ${archivedItems.length} archived items`);
+      console.log(`Successfully fetched ${archivedItems.length} archived items`);
       set({ archivedItems });
     } catch (error) {
       console.error("Failed to fetch archives:", error);
-      // Set empty array on error so UI doesn't show stale data
-      set({ archivedItems: [] });
+      // Don't clear existing archived items on error - keep what we have
+      // This prevents data loss if there's a temporary connection issue
+      // Only set empty array if we don't have any archived items yet
+      const currentState = get();
+      if (currentState.archivedItems.length === 0) {
+        set({ archivedItems: [] });
+      }
     }
   },
 
@@ -124,9 +130,14 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
     try {
       const state = get();
       const item = state.items.find((i) => i.id === id);
-      if (!item) return;
+      if (!item) {
+        console.error("Cannot archive: item not found with id:", id);
+        throw new Error("Item not found");
+      }
 
-      // Create archived item in database
+      console.log("Archiving item:", item.name, "with status:", status);
+
+      // Create archived item in database first
       const archivedItem = await createArchive({
         itemId: id,
         name: item.name,
@@ -135,16 +146,22 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
         archivedAt: new Date().toISOString(),
       });
 
-      // Remove from active items
+      console.log("Archived item created in database:", archivedItem.id);
+
+      // Remove from active items - only after archive succeeds
       await deleteFood(id);
-      
-      // Update state
+      console.log("Item deleted from active items");
+
+      // Update state only after both operations succeed
       set({
         items: state.items.filter((i) => i.id !== id),
         archivedItems: [...state.archivedItems, archivedItem],
       });
+
+      console.log("Archive completed successfully");
     } catch (error) {
       console.error("Failed to archive item:", error);
+      // Re-throw so UI can handle it (show error message, etc.)
       throw error;
     }
   },
