@@ -181,3 +181,62 @@ After both fixes:
 
 **Resolved** - All build issues fixed. Application successfully deploys to Render.
 
+---
+
+## Update: December 11, 2024 - Function Name Conflict
+
+**Date:** December 11, 2024  
+**Issue:** Build failed with "The symbol 'saveLocation' has already been declared"  
+**Status:** ✅ Resolved
+
+### Problem Identified
+
+When importing a hook that exports a function with the same name as a local function, TypeScript/esbuild throws a duplicate declaration error.
+
+**Error:**
+```
+ERROR: The symbol "saveLocation" has already been declared
+file: /Users/shonac/Cursor/Food-Compass/client/src/pages/add-details.tsx:198:11
+```
+
+**Root Cause:**
+- Imported `saveLocation` from `useSavedLocations()` hook
+- Also had a local function named `saveLocation` in the same file
+- Both functions existed in the same scope, causing conflict
+
+### Solution
+
+Rename the imported function using destructuring alias:
+
+**Before (Broken):**
+```typescript
+const { saveLocation } = useSavedLocations();
+
+function saveLocation(values: z.infer<typeof locationSchema>) {
+  // Local function
+}
+```
+
+**After (Fixed):**
+```typescript
+const { saveLocation: saveLocationToHistory } = useSavedLocations();
+
+function saveLocation(values: z.infer<typeof locationSchema>) {
+  // Local function - no conflict
+  // Use saveLocationToHistory() when calling the hook function
+}
+```
+
+### Lessons Learned
+
+1. **Always rename imported functions if they conflict with local functions** - Use destructuring alias syntax
+2. **Test build before deploying** - Build errors won't show in dev mode, only during production build
+3. **Check for naming conflicts** - When adding new hooks/imports, check if function names conflict with existing code
+
+### Related Files
+
+- `client/src/pages/add-details.tsx` - Fixed function name conflict
+- `client/src/hooks/use-saved-locations.ts` - Hook that exports `saveLocation`
+
+**Status:** ✅ Resolved - Build now completes successfully
+

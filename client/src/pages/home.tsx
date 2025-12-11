@@ -1,7 +1,7 @@
 import { Layout } from "@/components/mobile-layout";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Utensils, List, Plus, ChefHat, Store } from "lucide-react";
+import { Utensils, List, Plus, ChefHat, Store, Brain } from "lucide-react";
 import bgPattern from "@assets/generated_images/subtle_abstract_food_pattern_background.png";
 
 const container = {
@@ -30,7 +30,10 @@ export default function Home() {
 
       <div className="flex-1 flex flex-col justify-center gap-6 py-8">
         <div className="mb-4 px-2">
-          <h1 className="text-4xl font-bold text-primary mb-2 tracking-tight">Food<br/><span className="text-foreground italic">Faster</span></h1>
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-4xl font-bold text-primary tracking-tight">Food Decisions</h1>
+            <Brain size={20} className="text-primary/60" />
+          </div>
           <p className="text-muted-foreground text-lg">what and where shall we eat today?</p>
         </div>
 
