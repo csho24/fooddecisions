@@ -36,7 +36,9 @@ app.use(express.urlencoded({ extended: false }));
 // Health check endpoint - register early so it's available during startup
 // This helps prevent 503 errors during cold starts
 app.get("/health", (_req, res) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  const timestamp = new Date().toISOString();
+  log(`Health check requested - responding with OK`);
+  res.status(200).json({ status: "ok", timestamp });
 });
 
 export function log(message: string, source = "express") {
@@ -87,27 +89,57 @@ httpServer.listen(
   },
 );
 
-(async () => {
-  await registerRoutes(httpServer, app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
+// Add error handling for server listen errors
+httpServer.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    log(`Port ${port} is already in use`, "error");
   } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+    log(`Server error: ${err.message}`, "error");
   }
+  process.exit(1);
+});
 
-  // Server is already listening (started earlier for health endpoint)
-  // Other routes and static serving are now set up
+// Add global error handlers to prevent crashes
+process.on("uncaughtException", (err) => {
+  log(`Uncaught Exception: ${err.message}`, "error");
+  log(err.stack || "", "error");
+  // Don't exit - let the server continue running with health endpoint
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  log(`Unhandled Rejection at: ${promise}, reason: ${reason}`, "error");
+  // Don't exit - let the server continue running with health endpoint
+});
+
+(async () => {
+  try {
+    await registerRoutes(httpServer, app);
+
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+
+      log(`Error ${status}: ${message}`, "error");
+      res.status(status).json({ message });
+      // Don't throw - just log the error to prevent crashes
+    });
+
+    // importantly only setup vite in development and after
+    // setting up all the other routes so the catch-all route
+    // doesn't interfere with the other routes
+    if (process.env.NODE_ENV === "production") {
+      serveStatic(app);
+    } else {
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
+    }
+
+    // Server is already listening (started earlier for health endpoint)
+    // Other routes and static serving are now set up
+    log("Server initialization complete");
+  } catch (error) {
+    log(`Failed to initialize server: ${error instanceof Error ? error.message : String(error)}`, "error");
+    log(error instanceof Error ? error.stack || "" : "", "error");
+    // Don't exit - health endpoint should still work even if other routes fail
+  }
 })();
