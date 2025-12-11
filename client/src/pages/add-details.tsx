@@ -72,7 +72,7 @@ const HOME_CATEGORIES = [
 
 export default function AddPage() {
   const { items, addItem, updateItem, removeItem } = useFoodStore();
-  const { saveLocation } = useSavedLocations();
+  const { saveLocation: saveLocationToHistory } = useSavedLocations();
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
   const searchString = useSearch();
@@ -145,7 +145,8 @@ export default function AddPage() {
   }, [selectedItem, form]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    const capitalizedName = capitalizeWords(values.name);
+    // Ensure capitalization even if onBlur didn't fire
+    const capitalizedName = capitalizeWords(values.name.trim());
     if (selectedItem) {
       updateItem(selectedItem.id, {
         name: capitalizedName,
@@ -219,7 +220,7 @@ export default function AddPage() {
     }
 
     // Save to saved locations list for quick access
-    saveLocation(capitalizedLocationName);
+    saveLocationToHistory(capitalizedLocationName);
 
     updateItem(selectedItem.id, { locations: updatedLocations });
     

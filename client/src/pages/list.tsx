@@ -169,7 +169,8 @@ export default function ListPage() {
   }, [watchLocation]);
 
   function onQuickAdd(values: z.infer<typeof quickAddSchema>) {
-    const capitalizedName = capitalizeWords(values.name);
+    // Ensure capitalization even if onBlur didn't fire
+    const capitalizedName = capitalizeWords(values.name.trim());
     
     if (values.type === 'out' && values.location) {
       const capitalizedLocation = capitalizeWords(values.location.trim());
