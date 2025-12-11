@@ -3,17 +3,21 @@ import { Layout } from "@/components/mobile-layout";
 import { useFoodStore, FoodItem } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home as HomeIcon, Store, ChevronRight, MapPin, Clock, AlertCircle, Search, X } from "lucide-react";
+import { Home as HomeIcon, Store, ChevronRight, MapPin, Clock, AlertCircle, Search, X, Utensils } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
+import { categorizeFood, FoodCategory } from "@/lib/food-categories";
 
 export default function Decide() {
   const { items, checkAvailability } = useFoodStore();
   const [step, setStep] = useState<'type' | 'options'>('type');
   const [selectedType, setSelectedType] = useState<'home' | 'out' | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [outTab, setOutTab] = useState<'location' | 'food'>('location');
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [selectedFoodCategory, setSelectedFoodCategory] = useState<FoodCategory | null>(null);
 
   // Derived state for filtering and sorting
   const groupedItems = useMemo(() => {
@@ -58,15 +62,62 @@ export default function Decide() {
         return acc;
       }, {} as Record<string, typeof itemsWithAvailability>);
     } else {
-      // Group by Location for Out
+      // For Out items, return as-is (will be handled by tabs)
       return itemsWithAvailability.reduce((acc, item) => {
-        const loc = item.location || 'Unspecified';
-        if (!acc[loc]) acc[loc] = [];
-        acc[loc].push(item);
+        const key = 'All';
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
         return acc;
       }, {} as Record<string, typeof itemsWithAvailability>);
     }
   }, [items, selectedType, checkAvailability, searchQuery]);
+
+  // Get unique locations from Out items
+  const uniqueLocations = useMemo(() => {
+    if (selectedType !== 'out') return [];
+    const locations = new Set<string>();
+    items
+      .filter(item => item.type === 'out')
+      .forEach(item => {
+        if (item.locations && item.locations.length > 0) {
+          item.locations.forEach(loc => locations.add(loc.name));
+        }
+      });
+    return Array.from(locations).sort();
+  }, [items, selectedType]);
+
+  // Get items grouped by food category
+  const itemsByFoodCategory = useMemo(() => {
+    if (selectedType !== 'out') return {};
+    const outItems = items
+      .filter(item => item.type === 'out')
+      .map(item => ({
+        ...item,
+        status: checkAvailability(item),
+        foodCategory: categorizeFood(item.name)
+      }));
+    
+    return outItems.reduce((acc, item) => {
+      const category = item.foodCategory;
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(item);
+      return acc;
+    }, {} as Record<FoodCategory, typeof outItems>);
+  }, [items, selectedType, checkAvailability]);
+
+  // Get items for selected location
+  const itemsByLocation = useMemo(() => {
+    if (selectedType !== 'out' || !selectedLocation) return [];
+    return items
+      .filter(item => 
+        item.type === 'out' && 
+        item.locations?.some(loc => loc.name === selectedLocation)
+      )
+      .map(item => ({
+        ...item,
+        status: checkAvailability(item)
+      }));
+  }, [items, selectedType, selectedLocation, checkAvailability]);
 
   const handleTypeSelect = (type: 'home' | 'out') => {
     setSelectedType(type);
@@ -75,6 +126,79 @@ export default function Decide() {
   };
 
   const isSearching = searchQuery.trim().length > 0;
+
+  // Helper function to render items list
+  const renderItemsList = (itemsToRender: Array<FoodItem & { status: ReturnType<typeof checkAvailability> }>, allUnavailable?: boolean) => {
+    if (itemsToRender.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          <p>No items found.</p>
+        </div>
+      );
+    }
+
+    const sortedItems = [...itemsToRender].sort((a, b) => {
+      if (a.status.available === b.status.available) return 0;
+      return a.status.available ? -1 : 1;
+    });
+
+    const isUnavailable = allUnavailable ?? sortedItems.every(i => !i.status.available);
+
+    return (
+      <div className={cn(
+        "bg-card rounded-2xl border shadow-sm overflow-hidden",
+        isUnavailable && "opacity-60 bg-muted/50"
+      )}>
+        {sortedItems.map((item, index) => (
+          <div 
+            key={item.id}
+            className={cn(
+              "p-4 flex items-start gap-3 transition-colors",
+              index !== 0 && "border-t border-border/50",
+              !item.status.available ? "bg-muted/30 text-muted-foreground" : "hover:bg-accent/50 cursor-pointer"
+            )}
+          >
+            <div className={cn(
+              "w-2 h-2 mt-2 rounded-full shrink-0",
+              item.status.available ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-gray-300"
+            )} />
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-start gap-2">
+                <h4 className={cn(
+                  "font-semibold text-base leading-tight",
+                  !item.status.available && "line-through decoration-muted-foreground/50"
+                )}>
+                  {item.name}
+                </h4>
+                {!item.status.available && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 bg-destructive/10 text-destructive rounded flex items-center gap-1 whitespace-nowrap">
+                    <Clock size={10} /> {item.status.reason || "Closed"}
+                  </span>
+                )}
+              </div>
+              
+              {item.locations && item.locations.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {item.locations.map(loc => (
+                    <span key={loc.id} className="text-xs text-muted-foreground flex items-center gap-1">
+                      <MapPin size={10} /> {loc.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              {item.notes && (
+                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                  {item.notes}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <Layout 
@@ -248,81 +372,160 @@ export default function Decide() {
             animate={{ opacity: 1, y: 0 }}
             className="flex-1 flex flex-col h-full"
           >
-            <ScrollArea className="flex-1 -mx-4 px-4 pb-8">
-              <div className="space-y-6">
-                {Object.entries(groupedItems).map(([groupName, groupItems]) => {
-                  // Sort items: Available first, then unavailable
-                  const sortedItems = [...groupItems].sort((a, b) => {
-                    if (a.status.available === b.status.available) return 0;
-                    return a.status.available ? -1 : 1;
-                  });
+            {selectedType === 'out' ? (
+              <>
+                {/* Tabs for Out */}
+                <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-muted/30 rounded-xl shrink-0">
+                  <Button 
+                    variant={outTab === 'location' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    onClick={() => {
+                      setOutTab('location');
+                      setSelectedLocation(null);
+                    }}
+                    className="rounded-lg shadow-none h-10"
+                  >
+                    <MapPin size={16} className="mr-2" />
+                    Location
+                  </Button>
+                  <Button 
+                    variant={outTab === 'food' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    onClick={() => {
+                      setOutTab('food');
+                      setSelectedFoodCategory(null);
+                    }}
+                    className="rounded-lg shadow-none h-10"
+                  >
+                    <Utensils size={16} className="mr-2" />
+                    Food
+                  </Button>
+                </div>
 
-                  // Check if all items in this group are unavailable (for UI styling)
-                  const allUnavailable = sortedItems.every(i => !i.status.available);
-
-                  return (
-                    <div key={groupName} className="space-y-2">
-                      <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground px-1">
-                        {selectedType === 'out' && <MapPin size={16} />}
-                        {groupName}
-                      </h3>
-                      
-                      <div className={cn(
-                        "bg-card rounded-2xl border shadow-sm overflow-hidden",
-                        allUnavailable && "opacity-60 bg-muted/50"
-                      )}>
-                        {sortedItems.map((item, index) => (
-                          <div 
-                            key={item.id}
-                            className={cn(
-                              "p-4 flex items-start gap-3 transition-colors",
-                              index !== 0 && "border-t border-border/50",
-                              !item.status.available ? "bg-muted/30 text-muted-foreground" : "hover:bg-accent/50 cursor-pointer"
-                            )}
+                <ScrollArea className="flex-1 -mx-4 px-4 pb-8">
+                  {outTab === 'location' ? (
+                    <>
+                      {!selectedLocation ? (
+                        <div className="space-y-3">
+                          {uniqueLocations.map(location => (
+                            <Button
+                              key={location}
+                              variant="outline"
+                              className="w-full h-16 text-left justify-start rounded-xl"
+                              onClick={() => setSelectedLocation(location)}
+                            >
+                              <MapPin size={20} className="mr-3 text-primary" />
+                              <span className="text-lg font-medium">{location}</span>
+                            </Button>
+                          ))}
+                          {uniqueLocations.length === 0 && (
+                            <div className="text-center py-12 text-muted-foreground space-y-4">
+                              <p>No locations found.</p>
+                              <Button asChild className="rounded-xl">
+                                <a href="/add">Add Food & Details</a>
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <Button
+                            variant="ghost"
+                            className="mb-4"
+                            onClick={() => setSelectedLocation(null)}
                           >
-                            <div className={cn(
-                              "w-2 h-2 mt-2 rounded-full shrink-0",
-                              item.status.available ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-gray-300"
-                            )} />
-                            
-                            <div className="flex-1 min-w-0">
-                              <div className="flex justify-between items-start gap-2">
-                                <h4 className={cn(
-                                  "font-semibold text-base leading-tight",
-                                  !item.status.available && "line-through decoration-muted-foreground/50"
-                                )}>
-                                  {item.name}
-                                </h4>
-                                {!item.status.available && (
-                                  <span className="text-[10px] font-medium px-1.5 py-0.5 bg-destructive/10 text-destructive rounded flex items-center gap-1 whitespace-nowrap">
-                                    <Clock size={10} /> {item.status.reason || "Closed"}
+                            ← Back to Locations
+                          </Button>
+                          <div className="space-y-2">
+                            <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground px-1">
+                              <MapPin size={16} />
+                              {selectedLocation}
+                            </h3>
+                            {renderItemsList(itemsByLocation)}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {!selectedFoodCategory ? (
+                        <div className="space-y-3">
+                          {(['Noodles', 'Rice', 'Ethnic', 'Light', 'Western'] as FoodCategory[]).map(category => {
+                            const categoryItems = itemsByFoodCategory[category] || [];
+                            return (
+                              <Button
+                                key={category}
+                                variant="outline"
+                                className="w-full h-16 text-left justify-between rounded-xl"
+                                onClick={() => setSelectedFoodCategory(category)}
+                              >
+                                <div className="flex items-center">
+                                  <Utensils size={20} className="mr-3 text-primary" />
+                                  <span className="text-lg font-medium">{category}</span>
+                                </div>
+                                {categoryItems.length > 0 && (
+                                  <span className="text-sm text-muted-foreground">
+                                    {categoryItems.length}
                                   </span>
                                 )}
-                              </div>
-                              
-                              {item.notes && (
-                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                  {item.notes}
-                                </p>
-                              )}
-                            </div>
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <Button
+                            variant="ghost"
+                            className="mb-4"
+                            onClick={() => setSelectedFoodCategory(null)}
+                          >
+                            ← Back to Categories
+                          </Button>
+                          <div className="space-y-2">
+                            <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground px-1">
+                              <Utensils size={16} />
+                              {selectedFoodCategory}
+                            </h3>
+                            {renderItemsList(itemsByFoodCategory[selectedFoodCategory] || [])}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </ScrollArea>
+              </>
+            ) : (
+              /* Home type - keep existing logic */
+              <ScrollArea className="flex-1 -mx-4 px-4 pb-8">
+                <div className="space-y-6">
+                  {Object.entries(groupedItems).map(([groupName, groupItems]) => {
+                    const sortedItems = [...groupItems].sort((a, b) => {
+                      if (a.status.available === b.status.available) return 0;
+                      return a.status.available ? -1 : 1;
+                    });
+                    const allUnavailable = sortedItems.every(i => !i.status.available);
 
-                {Object.keys(groupedItems).length === 0 && (
-                  <div className="text-center py-12 text-muted-foreground space-y-4">
-                    <p>No items found in this category.</p>
-                    <Button asChild className="rounded-xl">
-                      <a href="/add">Add Food & Details</a>
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
+                    return (
+                      <div key={groupName} className="space-y-2">
+                        <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground px-1">
+                          {groupName}
+                        </h3>
+                        {renderItemsList(sortedItems, allUnavailable)}
+                      </div>
+                    );
+                  })}
+
+                  {Object.keys(groupedItems).length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground space-y-4">
+                      <p>No items found in this category.</p>
+                      <Button asChild className="rounded-xl">
+                        <a href="/add">Add Food & Details</a>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

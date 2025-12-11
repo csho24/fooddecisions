@@ -30,9 +30,11 @@ export default function Home() {
 
       <div className="flex-1 flex flex-col justify-center gap-6 py-8">
         <div className="mb-4 px-2">
-          <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-4xl font-bold text-primary tracking-tight">Food Decisions</h1>
-            <Brain size={20} className="text-primary/60" />
+          <div className="mb-2">
+            <div className="flex items-center gap-2">
+              <h1 className="text-4xl font-bold text-primary tracking-tight">Food<br/>Decisions</h1>
+              <Brain size={20} className="text-primary/60" />
+            </div>
           </div>
           <p className="text-muted-foreground text-lg">what and where shall we eat today?</p>
         </div>

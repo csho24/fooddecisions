@@ -158,6 +158,42 @@ PORT=8080 npm run dev
 
 **✅ Resolved** - Localhost development server now works correctly. Web preview accessible at `http://localhost:8080` (or any port specified via `PORT` environment variable).
 
+---
+
+## Update: December 11, 2024 - Default Port Changed to 8080
+
+**Date:** December 11, 2024  
+**Change:** Updated default port from 5000 to 8080  
+**Reason:** Port 5000 conflicts with macOS Control Center on many systems
+
+### Changes Made
+
+**File:** `server/index.ts`
+
+**Before:**
+```typescript
+const port = parseInt(process.env.PORT || "5000", 10);
+```
+
+**After:**
+```typescript
+const port = parseInt(process.env.PORT || "8080", 10);
+```
+
+### Impact
+
+- Default port is now 8080 instead of 5000
+- Reduces port conflicts on macOS systems
+- Can still override with `PORT` environment variable: `PORT=3000 npm run dev`
+
+### Testing
+
+- ✅ Server starts on port 8080 by default
+- ✅ Health endpoint responds correctly
+- ✅ Web preview accessible at `http://localhost:8080`
+
+**Status:** ✅ Default port updated to 8080
+
 
 
 
