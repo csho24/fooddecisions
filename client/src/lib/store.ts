@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { getDay, format } from 'date-fns';
-import { getFoods, createFood, updateFood, deleteFood, getArchives, createArchive } from './api';
+import { getFoods, createFood, updateFood, deleteFood, getArchives, createArchive, deleteArchive } from './api';
 
 export type FoodType = 'home' | 'out';
 
@@ -55,6 +55,7 @@ interface StoreState {
   updateItem: (id: string, updates: Partial<FoodItem>) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   archiveItem: (id: string, status: 'eaten' | 'thrown') => Promise<void>;
+  deleteArchivedItem: (id: string) => Promise<void>;
   checkAvailability: (item: FoodItem, locationId?: string) => { available: boolean; reason?: string };
 }
 
@@ -162,6 +163,18 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
     } catch (error) {
       console.error("Failed to archive item:", error);
       // Re-throw so UI can handle it (show error message, etc.)
+      throw error;
+    }
+  },
+
+  deleteArchivedItem: async (id) => {
+    try {
+      await deleteArchive(id);
+      set((state) => ({
+        archivedItems: state.archivedItems.filter((i) => i.id !== id),
+      }));
+    } catch (error) {
+      console.error("Failed to delete archived item:", error);
       throw error;
     }
   },

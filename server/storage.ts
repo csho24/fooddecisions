@@ -65,6 +65,10 @@ export class DatabaseStorage implements IStorage {
     const results = await db.insert(archivedItems).values(item).returning();
     return results[0];
   }
+
+  async deleteArchivedItem(id: number): Promise<void> {
+    await db.delete(archivedItems).where(eq(archivedItems.id, id));
+  }
 }
 
 export const storage = new DatabaseStorage();

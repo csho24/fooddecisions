@@ -85,7 +85,7 @@ app.use((req, res, next) => {
 
 // Start server listening EARLY so health endpoint can respond immediately
 // This prevents 503 errors during cold starts when other routes are still initializing
-const port = parseInt(process.env.PORT || "5000", 10);
+const port = parseInt(process.env.PORT || "8080", 10);
 httpServer.listen(
   port,
   "0.0.0.0",

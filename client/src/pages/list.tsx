@@ -1,11 +1,12 @@
 import { Layout } from "@/components/mobile-layout";
-import { useFoodStore, FoodItem, FoodType, ArchivedItem } from "@/lib/store";
+import { useFoodStore, FoodItem, FoodType, ArchivedItem, LocationDetail } from "@/lib/store";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Home, Utensils, Clock, X, MapPin, AlertCircle, Plus, ChevronDown, Check, ChevronRight, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, useMemo } from "react";
-import { cn } from "@/lib/utils";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { cn, capitalizeWords } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
@@ -14,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation } from "wouter";
+import { useSavedLocations } from "@/hooks/use-saved-locations";
 import {
   Dialog,
   DialogContent,
@@ -35,16 +37,28 @@ const quickAddSchema = z.object({
   name: z.string().min(2, "Name is required"),
   type: z.enum(['home', 'out']),
   category: z.string().optional(), // For Home
+  location: z.string().optional(), // For Out - required when type is 'out'
+}).refine((data) => {
+  if (data.type === 'out') {
+    return data.location && data.location.trim().length >= 2;
+  }
+  return true;
+}, {
+  message: "Location is required for Out items",
+  path: ["location"],
 });
 
 export default function ListPage() {
-  const { items, archivedItems, removeItem, checkAvailability, addItem, archiveItem } = useFoodStore();
+  const { items, archivedItems, removeItem, checkAvailability, addItem, archiveItem, deleteArchivedItem } = useFoodStore();
+  const { saveLocation, getFilteredLocations } = useSavedLocations();
   const [filter, setFilter] = useState<'home' | 'out'>('home');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [_, setLocation] = useLocation();
   const [itemToArchive, setItemToArchive] = useState<string | null>(null);
-  const [showThrownList, setShowThrownList] = useState(false);
   const [showEatenStats, setShowEatenStats] = useState(false);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const locationInputRef = useRef<HTMLInputElement>(null);
 
   const filteredItems = items.filter(item => item.type === filter);
   
@@ -81,10 +95,33 @@ export default function ListPage() {
       return isAfter(archivedDate, yearStart) || archivedDate.getTime() === yearStart.getTime();
     }).length;
 
-    const total = eatenItems.length;
-
-    return { thisWeek, thisMonth, thisYear, total };
+    return { thisWeek, thisMonth, thisYear };
   }, [eatenItems]);
+
+  // Calculate thrown counts by time period
+  const thrownStats = useMemo(() => {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+    const monthStart = startOfMonth(now);
+    const yearStart = startOfYear(now);
+
+    const thisWeek = thrownItems.filter(item => {
+      const archivedDate = new Date(item.archivedAt);
+      return isAfter(archivedDate, weekStart) || archivedDate.getTime() === weekStart.getTime();
+    }).length;
+
+    const thisMonth = thrownItems.filter(item => {
+      const archivedDate = new Date(item.archivedAt);
+      return isAfter(archivedDate, monthStart) || archivedDate.getTime() === monthStart.getTime();
+    }).length;
+
+    const thisYear = thrownItems.filter(item => {
+      const archivedDate = new Date(item.archivedAt);
+      return isAfter(archivedDate, yearStart) || archivedDate.getTime() === yearStart.getTime();
+    }).length;
+
+    return { thisWeek, thisMonth, thisYear };
+  }, [thrownItems]);
 
   // Sort items
   const sortedItems = filteredItems.sort((a, b) => {
@@ -96,25 +133,76 @@ export default function ListPage() {
     resolver: zodResolver(quickAddSchema),
     defaultValues: {
       name: "",
-      type: "home", 
+      type: filter, // Sync with current filter
       category: "",
+      location: "",
     },
   });
 
+  // Sync form type with filter when quick add opens or filter changes
+  useEffect(() => {
+    if (isQuickAddOpen) {
+      form.setValue('type', filter);
+      // Reset form when switching between home/out
+      form.reset({
+        name: "",
+        type: filter,
+        category: "",
+        location: "",
+      });
+    }
+  }, [filter, isQuickAddOpen, form]);
+
   const watchType = form.watch("type");
+  const watchLocation = form.watch("location");
+
+  // Get location suggestions
+  const locationSuggestions = useMemo(() => {
+    return getFilteredLocations(locationQuery || watchLocation || "");
+  }, [locationQuery, watchLocation, getFilteredLocations]);
+
+  // Update location query when form location changes
+  useEffect(() => {
+    if (watchLocation) {
+      setLocationQuery(watchLocation);
+    }
+  }, [watchLocation]);
 
   function onQuickAdd(values: z.infer<typeof quickAddSchema>) {
-    addItem({
-      name: values.name,
-      type: values.type as FoodType,
-      category: values.type === 'home' ? values.category : undefined,
-      locations: values.type === 'out' ? [] : undefined, 
-    });
+    const capitalizedName = capitalizeWords(values.name);
+    
+    if (values.type === 'out' && values.location) {
+      const capitalizedLocation = capitalizeWords(values.location.trim());
+      saveLocation(capitalizedLocation);
+      
+      // Create location detail
+      const locationDetail: LocationDetail = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: capitalizedLocation,
+      };
+      
+      addItem({
+        name: capitalizedName,
+        type: values.type as FoodType,
+        locations: [locationDetail],
+      });
+    } else {
+      addItem({
+        name: capitalizedName,
+        type: values.type as FoodType,
+        category: values.type === 'home' ? values.category : undefined,
+        locations: values.type === 'out' ? [] : undefined, 
+      });
+    }
+    
     form.reset({
       name: "",
       type: values.type as FoodType, 
       category: "",
+      location: "",
     });
+    setLocationQuery("");
+    setShowLocationSuggestions(false);
     setIsQuickAddOpen(false);
   }
 
@@ -198,7 +286,15 @@ export default function ListPage() {
                       render={({ field }) => (
                         <FormItem className="flex-1">
                           <FormControl>
-                            <Input placeholder="What is it?" {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
+                            <Input 
+                              placeholder="What is it?" 
+                              {...field} 
+                              className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all"
+                              onBlur={(e) => {
+                                const capitalized = capitalizeWords(e.target.value);
+                                field.onChange(capitalized);
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -226,6 +322,65 @@ export default function ListPage() {
                               ))}
                             </SelectContent>
                           </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {watchType === 'out' && (
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem className="relative">
+                          <FormControl>
+                            <div className="relative">
+                              <Input
+                                {...field}
+                                ref={locationInputRef}
+                                placeholder="Location (e.g. Maxwell, Empress Place)"
+                                className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all pr-10"
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  setLocationQuery(e.target.value);
+                                  setShowLocationSuggestions(true);
+                                }}
+                                onFocus={() => setShowLocationSuggestions(true)}
+                                onBlur={(e) => {
+                                  // Capitalize on blur
+                                  const capitalized = capitalizeWords(e.target.value);
+                                  field.onChange(capitalized);
+                                  setLocationQuery(capitalized);
+                                  // Delay hiding to allow clicks on suggestions
+                                  setTimeout(() => setShowLocationSuggestions(false), 200);
+                                }}
+                              />
+                              <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            </div>
+                          </FormControl>
+                          {showLocationSuggestions && locationSuggestions.length > 0 && (
+                            <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                              {locationSuggestions.map((loc) => (
+                                <button
+                                  key={loc}
+                                  type="button"
+                                  className="w-full text-left px-4 py-3 hover:bg-accent transition-colors first:rounded-t-xl last:rounded-b-xl"
+                                  onClick={() => {
+                                    form.setValue('location', loc);
+                                    setLocationQuery(loc);
+                                    setShowLocationSuggestions(false);
+                                    locationInputRef.current?.blur();
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                                    <span>{loc}</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
@@ -356,45 +511,29 @@ export default function ListPage() {
       {/* Archive Section */}
       {filter === 'home' && (thrownItems.length > 0 || eatenItems.length > 0) && (
         <div className="mt-6 border-t border-border/50 pt-4 px-4 space-y-4">
-          {/* Thrown Items List - For Review */}
+          {/* Food Wasted Stats - Clickable to Detail Page */}
           {thrownItems.length > 0 && (
-            <Collapsible open={showThrownList} onOpenChange={setShowThrownList}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-between mb-3">
-                  <span className="font-medium text-red-700">Thrown Items ({thrownItems.length})</span>
-                  <ChevronDown className={cn("transition-transform", showThrownList && "rotate-180")} size={16} />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="space-y-2 mb-4">
-                  <p className="text-xs text-muted-foreground mb-2">Review items to avoid buying/keeping in future</p>
-                  {thrownItems.map((archivedItem) => (
-                    <div
-                      key={archivedItem.id}
-                      className="bg-card border border-red-200 bg-red-50/50 rounded-xl p-3 flex items-center gap-3"
-                    >
-                      <div className="w-2 h-2 rounded-full bg-red-500" />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm text-red-700">
-                          {archivedItem.name}
-                        </p>
-                        {archivedItem.category && (
-                          <p className="text-xs text-muted-foreground">{archivedItem.category}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-between mb-3"
+              onClick={() => setLocation('/food-wasted')}
+            >
+              <span className="font-medium text-red-700">Food Wasted</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {thrownStats.thisWeek} this week
+                </span>
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </div>
+            </Button>
           )}
 
-          {/* Eaten Items Stats - Counts Only */}
+          {/* Food Saved! Stats - Counts Only */}
           {eatenItems.length > 0 && (
             <Collapsible open={showEatenStats} onOpenChange={setShowEatenStats}>
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" className="w-full justify-between mb-3">
-                  <span className="font-medium text-green-700">Items Saved</span>
+                  <span className="font-medium text-green-700">Food Saved!</span>
                   <ChevronDown className={cn("transition-transform", showEatenStats && "rotate-180")} size={16} />
                 </Button>
               </CollapsibleTrigger>
@@ -412,10 +551,6 @@ export default function ListPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">This Year</span>
                       <span className="text-lg font-bold text-green-700">{eatenStats.thisYear}</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-green-200">
-                      <span className="text-sm font-medium text-green-700">Total</span>
-                      <span className="text-xl font-bold text-green-700">{eatenStats.total}</span>
                     </div>
                   </div>
                 </div>

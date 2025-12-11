@@ -12,9 +12,10 @@ import { useLocation, useSearch } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, capitalizeWords } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
+import { useSavedLocations } from "@/hooks/use-saved-locations";
 import { Search, ChevronDown, Home, Utensils, Clock, Plus, MapPin, X, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -71,6 +72,7 @@ const HOME_CATEGORIES = [
 
 export default function AddPage() {
   const { items, addItem, updateItem, removeItem } = useFoodStore();
+  const { saveLocation } = useSavedLocations();
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
   const searchString = useSearch();
@@ -143,16 +145,17 @@ export default function AddPage() {
   }, [selectedItem, form]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
+    const capitalizedName = capitalizeWords(values.name);
     if (selectedItem) {
       updateItem(selectedItem.id, {
-        name: values.name,
+        name: capitalizedName,
         category: values.type === 'home' ? values.category : undefined,
       });
       toast({ title: "Updated!", description: "Item details saved." });
     } else {
         // Creating new item from scratch via this page (unlikely given flow, but possible)
         addItem({
-            name: values.name,
+            name: capitalizedName,
             type: values.type as FoodType,
             category: values.category,
             locations: [],
@@ -194,9 +197,11 @@ export default function AddPage() {
   function saveLocation(values: z.infer<typeof locationSchema>) {
     if (!selectedItem) return;
 
+    const capitalizedLocationName = capitalizeWords(values.name);
+
     const newLocation: LocationDetail = {
       id: values.id || Math.random().toString(36).substr(2, 9),
-      name: values.name,
+      name: capitalizedLocationName,
       notes: values.notes,
       openingHours: isHoursOpen && values.openTime && values.closeTime ? {
         open: values.openTime,
@@ -213,13 +218,16 @@ export default function AddPage() {
       updatedLocations = [...updatedLocations, newLocation];
     }
 
+    // Save to saved locations list for quick access
+    saveLocation(capitalizedLocationName);
+
     updateItem(selectedItem.id, { locations: updatedLocations });
     
     // Update local state to reflect changes immediately
     setSelectedItem({ ...selectedItem, locations: updatedLocations });
     
     setIsLocationDialogOpen(false);
-    toast({ title: "Location Saved", description: `${values.name} updated.` });
+    toast({ title: "Location Saved", description: `${capitalizedLocationName} updated.` });
   }
 
   function deleteLocation(id: string) {
@@ -326,7 +334,14 @@ export default function AddPage() {
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <Input {...field} className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all" />
+                  <Input 
+                    {...field} 
+                    className="h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all"
+                    onBlur={(e) => {
+                      const capitalized = capitalizeWords(e.target.value);
+                      field.onChange(capitalized);
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -453,6 +468,10 @@ export default function AddPage() {
                     <Input 
                         value={locationForm.watch('name')} 
                         onChange={(e) => locationForm.setValue('name', e.target.value)}
+                        onBlur={(e) => {
+                          const capitalized = capitalizeWords(e.target.value);
+                          locationForm.setValue('name', capitalized);
+                        }}
                         placeholder="e.g. Maxwell or Bedok"
                         className="h-12 rounded-xl bg-muted/30"
                     />

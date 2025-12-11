@@ -60,3 +60,10 @@ export async function createArchive(data: Omit<ArchivedItem, "id">): Promise<Arc
   const item = await response.json();
   return { ...item, id: item.id.toString(), itemId: item.itemId.toString() };
 }
+
+export async function deleteArchive(id: string): Promise<void> {
+  const response = await fetch(`/api/archives/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Failed to delete archive");
+}

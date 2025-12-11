@@ -103,5 +103,15 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/archives/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteArchivedItem(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete archived item" });
+    }
+  });
+
   return httpServer;
 }

@@ -8,6 +8,7 @@ import Home from "@/pages/home";
 import Decide from "@/pages/decide";
 import ListPage from "@/pages/list";
 import AddPage from "@/pages/add-details";
+import FoodWastedPage from "@/pages/food-wasted";
 import { useEffect } from "react";
 import { useFoodStore } from "@/lib/store";
 
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/decide" component={Decide}/>
       <Route path="/list" component={ListPage}/>
       <Route path="/add" component={AddPage}/>
+      <Route path="/food-wasted" component={FoodWastedPage}/>
       <Route component={NotFound} />
     </Switch>
   );
