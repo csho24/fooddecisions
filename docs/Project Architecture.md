@@ -11,11 +11,12 @@ This document explains how the Food Compass website works, covering architectura
 1. [Saved Locations System](#1-saved-locations-system)
 2. [Automatic Text Capitalization](#2-automatic-text-capitalization)
 3. [Food Categorization System](#3-food-categorization-system)
-4. [Location Management](#4-location-management)
-5. [State Management](#5-state-management)
-6. [Form Validation](#6-form-validation)
-7. [UI/UX Patterns](#7-uiux-patterns)
-8. [Mobile-First Design](#8-mobile-first-design)
+4. [Closure Schedule System](#4-closure-schedule-system)
+5. [Location Management](#5-location-management)
+6. [State Management](#6-state-management)
+7. [Form Validation](#7-form-validation)
+8. [UI/UX Patterns](#8-uiux-patterns)
+9. [Mobile-First Design](#9-mobile-first-design)
 
 ---
 
@@ -180,7 +181,59 @@ if (lower.includes('noodle') || lower.includes('mee') || lower.includes('laksa')
 
 ---
 
-## 4. Location Management
+## 4. Closure Schedule System
+
+Manages eatery closure schedules for cleaning days and time off. Both types share a unified calendar showing all closure dates.
+
+### Files
+- UI: `client/src/pages/add-details.tsx`
+- Schema: `shared/schema.ts` - `closureSchedules` table
+- Storage: `server/storage.ts` - `bulkCreateClosureSchedules()`
+- Routes: `server/routes.ts` - `/api/closures`
+- API: `client/src/lib/api.ts` - `createClosureSchedules()`
+
+### Database
+
+**Table:** `closure_schedules`
+- `type`: 'cleaning' | 'timeoff'
+- `date`: ISO date string (YYYY-MM-DD)
+- `location`: Text (required for cleaning, null for timeoff)
+- Indexed on `date` and `type`
+
+### UI Flow
+
+1. Main → "Closure" card
+2. Closure → "Cleaning" and "Time Off" cards
+3. Each opens multi-select calendar
+4. Calendar shows ALL selected dates (cleaning + timeoff combined)
+5. Cleaning requires location input, Time Off doesn't
+6. Time Off only allows future dates
+7. Saves multiple dates in single API call
+
+### Implementation
+
+**Unified Calendar:**
+```typescript
+selected={[...selectedCleaningDates, ...selectedTimeOffDates]}
+```
+
+**Bulk Creation:**
+```typescript
+const schedules = dates.map(date => ({
+  type: 'cleaning',
+  date: date.toISOString().split('T')[0],
+  location: cleaningLocation
+}));
+await createClosureSchedules(schedules);
+```
+
+**Date Restrictions:**
+- Cleaning: Any date
+- Time Off: `disabled={(date) => date < today}`
+
+---
+
+## 5. Location Management
 
 ### File: `client/src/pages/add-details.tsx`
 
@@ -255,7 +308,7 @@ Opening hours are hidden behind a toggle to keep the UI simple for basic use cas
 
 ---
 
-## 5. State Management
+## 6. State Management
 
 ### Strategy: Local State for UI, Store for Data
 
@@ -286,7 +339,7 @@ const { items, addItem, updateItem, removeItem } = useFoodStore();
 
 ---
 
-## 6. Form Validation
+## 7. Form Validation
 
 ### Using Zod Schemas
 
@@ -316,7 +369,7 @@ Match schema's required fields to what's actually essential. Everything else opt
 
 ---
 
-## 7. UI/UX Patterns
+## 8. UI/UX Patterns
 
 ### Consistent Sizing
 
@@ -356,7 +409,7 @@ All interactive elements meet the **44x44px minimum** touch target guideline:
 
 ---
 
-## 8. Mobile-First Design
+## 9. Mobile-First Design
 
 ### Touch Interactions
 

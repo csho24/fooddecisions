@@ -67,3 +67,29 @@ export async function deleteArchive(id: string): Promise<void> {
   });
   if (!response.ok) throw new Error("Failed to delete archive");
 }
+
+export interface ClosureSchedule {
+  id: number;
+  type: 'cleaning' | 'timeoff';
+  date: string;
+  location?: string;
+  createdAt: string;
+}
+
+export async function getClosureSchedules(): Promise<ClosureSchedule[]> {
+  const response = await fetch("/api/closures");
+  if (!response.ok) throw new Error("Failed to fetch closure schedules");
+  return await response.json();
+}
+
+export async function createClosureSchedules(
+  schedules: Array<{ type: 'cleaning' | 'timeoff'; date: string; location?: string }>
+): Promise<ClosureSchedule[]> {
+  const response = await fetch("/api/closures", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ schedules }),
+  });
+  if (!response.ok) throw new Error("Failed to create closure schedules");
+  return await response.json();
+}

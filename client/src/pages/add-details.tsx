@@ -16,7 +16,9 @@ import { cn, capitalizeWords } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
 import { useSavedLocations } from "@/hooks/use-saved-locations";
-import { Search, ChevronDown, Home, Utensils, Clock, Plus, MapPin, X, Trash2 } from "lucide-react";
+import { Search, ChevronDown, Home, Utensils, Clock, Plus, MapPin, X, Trash2, Calendar as CalendarIcon, Sparkles } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { createClosureSchedules } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { categorizeFood } from "@/lib/food-categories";
@@ -82,6 +84,10 @@ export default function AddPage() {
   const [step, setStep] = useState<'select' | 'edit'>('select');
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<'home' | 'out'>('home');
+  const [closureStep, setClosureStep] = useState<'main' | 'closure' | 'cleaning' | 'timeoff'>('main');
+  const [selectedCleaningDates, setSelectedCleaningDates] = useState<Date[]>([]);
+  const [selectedTimeOffDates, setSelectedTimeOffDates] = useState<Date[]>([]);
+  const [cleaningLocation, setCleaningLocation] = useState("");
   
   // Location Editing State
   const [editingLocation, setEditingLocation] = useState<LocationDetail | null>(null);
@@ -287,69 +293,158 @@ export default function AddPage() {
   }
 
   if (step === 'select') {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     return (
       <Layout showBack title="Add Info">
         <div className="space-y-4 h-full flex flex-col">
-          {/* Tabs */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-muted/30 rounded-xl">
-            <Button 
-              variant={activeTab === 'home' ? 'default' : 'ghost'} 
-              size="sm" 
-              onClick={() => { setActiveTab('home'); setSearchQuery(""); }}
-              className="rounded-lg shadow-none"
-            >
-              <Home size={16} className="mr-2" />
-              Home
-            </Button>
-            <Button 
-              variant={activeTab === 'out' ? 'default' : 'ghost'} 
-              size="sm" 
-              onClick={() => { setActiveTab('out'); setSearchQuery(""); }}
-              className="rounded-lg shadow-none"
-            >
-              <Utensils size={16} className="mr-2" />
-              Out
-            </Button>
-          </div>
-
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input 
-              placeholder={`Search ${activeTab}...`} 
-              className="pl-9 h-12 rounded-xl bg-muted/30 border-transparent focus:bg-background transition-all"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <ScrollArea className="flex-1 -mx-4 px-4">
-            <div className="space-y-2 pb-4">
-              {filteredItems.map(item => (
-                <div 
-                  key={item.id}
-                  onClick={() => {
-                    setSelectedItem(item);
-                    setStep('edit');
-                  }}
-                  className="p-4 bg-card border border-border/50 rounded-xl flex justify-between items-center hover:bg-accent/50 cursor-pointer transition-all"
+          {closureStep === 'main' ? (
+            <div className="grid grid-cols-1 gap-4">
+              <Button 
+                variant="outline"
+                className="h-32 text-xl rounded-3xl flex flex-col gap-3 border-2 hover:border-purple-500 hover:bg-purple-50 transition-all"
+                onClick={() => setClosureStep('closure')}
+              >
+                <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                  <CalendarIcon size={24} />
+                </div>
+                <span>Closure</span>
+                <span className="text-xs font-normal text-muted-foreground">Manage store schedule</span>
+              </Button>
+            </div>
+          ) : closureStep === 'closure' ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <Button 
+                  variant="outline"
+                  className="h-32 text-xl rounded-3xl flex flex-col gap-3 border-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+                  onClick={() => setClosureStep('cleaning')}
                 >
-                  <div>
-                    <h3 className="font-semibold">{item.name}</h3>
-                    {item.type === 'out' && item.locations && item.locations.length > 0 && (
-                        <p className="text-xs text-muted-foreground">{item.locations.length} Locations</p>
-                    )}
+                  <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                    <Sparkles size={24} />
                   </div>
-                  <ChevronDown className="-rotate-90 text-muted-foreground" size={16} />
-                </div>
-              ))}
-              
-              {filteredItems.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>No items found.</p>
-                </div>
+                  <span>Cleaning</span>
+                  <span className="text-xs font-normal text-muted-foreground">Select cleaning days</span>
+                </Button>
+                
+                <Button 
+                  variant="outline"
+                  className="h-32 text-xl rounded-3xl flex flex-col gap-3 border-2 hover:border-amber-500 hover:bg-amber-50 transition-all"
+                  onClick={() => setClosureStep('timeoff')}
+                >
+                  <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                    <CalendarIcon size={24} />
+                  </div>
+                  <span>Time Off</span>
+                  <span className="text-xs font-normal text-muted-foreground">Schedule future closures</span>
+                </Button>
+              </div>
+            </div>
+          ) : closureStep === 'cleaning' ? (
+            <div className="space-y-4">
+              <h3 className="font-bold text-lg">Cleaning Days</h3>
+              <Calendar
+                mode="multiple"
+                selected={[...selectedCleaningDates, ...selectedTimeOffDates]}
+                onSelect={(dates) => setSelectedCleaningDates(dates || [])}
+                className="rounded-xl border w-full scale-110 origin-top"
+              />
+              {selectedCleaningDates.length > 0 && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Location</Label>
+                    <Input 
+                      placeholder="Enter cleaning location"
+                      value={cleaningLocation}
+                      onChange={(e) => setCleaningLocation(e.target.value)}
+                      onBlur={(e) => {
+                        const capitalized = capitalizeWords(e.target.value);
+                        setCleaningLocation(capitalized);
+                      }}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                  <Button 
+                    onClick={async () => {
+                      try {
+                        const schedules = selectedCleaningDates.map(date => ({
+                          type: 'cleaning' as const,
+                          date: date.toISOString().split('T')[0],
+                          location: cleaningLocation.trim()
+                        }));
+                        
+                        await createClosureSchedules(schedules);
+                        
+                        toast({ 
+                          title: "Saved!", 
+                          description: `${selectedCleaningDates.length} cleaning day${selectedCleaningDates.length !== 1 ? 's' : ''} saved.` 
+                        });
+                        
+                        // Reset state
+                        setSelectedCleaningDates([]);
+                        setCleaningLocation("");
+                      } catch (error) {
+                        console.error('Error saving cleaning schedule:', error);
+                        toast({ 
+                          title: "Error", 
+                          description: "Failed to save cleaning schedule.",
+                          variant: "destructive"
+                        });
+                      }
+                    }}
+                    className="w-full h-14 text-lg rounded-xl"
+                    disabled={!cleaningLocation.trim()}
+                  >
+                    Save
+                  </Button>
+                </>
               )}
             </div>
-          </ScrollArea>
+          ) : (
+            <div className="space-y-4">
+              <h3 className="font-bold text-lg">Time Off</h3>
+              <Calendar
+                mode="multiple"
+                selected={[...selectedCleaningDates, ...selectedTimeOffDates]}
+                onSelect={(dates) => setSelectedTimeOffDates(dates || [])}
+                disabled={(date) => date < today}
+                className="rounded-xl border w-full scale-110 origin-top"
+              />
+              {selectedTimeOffDates.length > 0 && (
+                <Button 
+                  onClick={async () => {
+                    try {
+                      const schedules = selectedTimeOffDates.map(date => ({
+                        type: 'timeoff' as const,
+                        date: date.toISOString().split('T')[0]
+                      }));
+                      
+                      await createClosureSchedules(schedules);
+                      
+                      toast({ 
+                        title: "Saved!", 
+                        description: `${selectedTimeOffDates.length} time off day${selectedTimeOffDates.length !== 1 ? 's' : ''} saved.` 
+                      });
+                      
+                      // Reset state
+                      setSelectedTimeOffDates([]);
+                    } catch (error) {
+                      console.error('Error saving time off schedule:', error);
+                      toast({ 
+                        title: "Error", 
+                        description: "Failed to save time off schedule.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  className="w-full h-14 text-lg rounded-xl"
+                >
+                  Save
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </Layout>
     );

@@ -19,6 +19,7 @@ export default function Decide() {
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedFoodCategory, setSelectedFoodCategory] = useState<FoodCategory | null>(null);
   const [selectedFoodFromLocation, setSelectedFoodFromLocation] = useState<string | null>(null);
+  const [selectedFoodFromCategory, setSelectedFoodFromCategory] = useState<string | null>(null);
 
   // Derived state for filtering and sorting
   const groupedItems = useMemo(() => {
@@ -135,6 +136,7 @@ export default function Decide() {
     setSelectedLocation(null); // Reset location selection
     setSelectedFoodCategory(null); // Reset food category selection
     setSelectedFoodFromLocation(null); // Reset food from location selection
+    setSelectedFoodFromCategory(null); // Reset food from category selection
   };
 
   const isSearching = searchQuery.trim().length > 0;
@@ -542,21 +544,81 @@ export default function Decide() {
                             );
                           })}
                         </div>
+                      ) : !selectedFoodFromCategory ? (
+                        <div className="space-y-4">
+                          <Button
+                            variant="ghost"
+                            className="mb-4"
+                            onClick={() => {
+                              setSelectedFoodCategory(null);
+                              setSelectedFoodFromCategory(null);
+                            }}
+                          >
+                            ← Back to Categories
+                          </Button>
+                          <div className="space-y-3">
+                            {((itemsByFoodCategory as any)[selectedFoodCategory] || []).map((item: FoodItem & { status: ReturnType<typeof checkAvailability> }) => (
+                              <Button
+                                key={item.id}
+                                variant="outline"
+                                className="w-full h-16 text-left justify-start rounded-xl"
+                                onClick={() => setSelectedFoodFromCategory(item.name)}
+                              >
+                                <Utensils size={20} className="mr-3 text-primary" />
+                                <span className="text-lg font-medium">{item.name}</span>
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
                       ) : (
                         <div className="space-y-4">
                           <Button
                             variant="ghost"
                             className="mb-4"
-                            onClick={() => setSelectedFoodCategory(null)}
+                            onClick={() => setSelectedFoodFromCategory(null)}
                           >
-                            ← Back to Categories
+                            ← Back to {selectedFoodCategory}
                           </Button>
                           <div className="space-y-2">
                             <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground px-1">
                               <Utensils size={16} />
-                              {selectedFoodCategory}
+                              {selectedFoodFromCategory}
                             </h3>
-                            {renderItemsList((itemsByFoodCategory as any)[selectedFoodCategory] || [])}
+                            {(() => {
+                              const foodItem = items.find(i => i.name === selectedFoodFromCategory);
+                              if (!foodItem || !foodItem.locations || foodItem.locations.length === 0) {
+                                return <div className="text-muted-foreground text-center py-8">No locations found</div>;
+                              }
+                              return (
+                                <div className="bg-card rounded-2xl border shadow-sm overflow-hidden">
+                                  {foodItem.locations.map((loc, index) => (
+                                    <div 
+                                      key={loc.id}
+                                      className={cn(
+                                        "p-4",
+                                        index !== 0 && "border-t border-border/50"
+                                      )}
+                                    >
+                                      <div className="flex items-start gap-3">
+                                        <MapPin size={18} className="text-primary mt-1" />
+                                        <div className="flex-1">
+                                          <div className="font-semibold text-lg">{loc.name}</div>
+                                          {loc.notes && (
+                                            <p className="text-sm text-muted-foreground mt-1">{loc.notes}</p>
+                                          )}
+                                          {loc.openingHours && (
+                                            <div className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                                              <Clock size={12} />
+                                              {loc.openingHours.open} - {loc.openingHours.close}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       )}

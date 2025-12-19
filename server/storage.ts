@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { type User, type InsertUser, type FoodItem, type InsertFoodItem, type UpdateFoodItem, type ArchivedItem, type InsertArchivedItem, foodItems, archivedItems } from "@shared/schema";
+import { type User, type InsertUser, type FoodItem, type InsertFoodItem, type UpdateFoodItem, type ArchivedItem, type InsertArchivedItem, type ClosureSchedule, type InsertClosureSchedule, foodItems, archivedItems, closureSchedules } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 
@@ -16,6 +16,10 @@ export interface IStorage {
   
   getArchivedItems(): Promise<ArchivedItem[]>;
   createArchivedItem(item: InsertArchivedItem): Promise<ArchivedItem>;
+  
+  getClosureSchedules(): Promise<ClosureSchedule[]>;
+  createClosureSchedule(schedule: InsertClosureSchedule): Promise<ClosureSchedule>;
+  bulkCreateClosureSchedules(schedules: InsertClosureSchedule[]): Promise<ClosureSchedule[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -68,6 +72,21 @@ export class DatabaseStorage implements IStorage {
 
   async deleteArchivedItem(id: number): Promise<void> {
     await db.delete(archivedItems).where(eq(archivedItems.id, id));
+  }
+
+  async getClosureSchedules(): Promise<ClosureSchedule[]> {
+    return await db.select().from(closureSchedules);
+  }
+
+  async createClosureSchedule(schedule: InsertClosureSchedule): Promise<ClosureSchedule> {
+    const results = await db.insert(closureSchedules).values(schedule).returning();
+    return results[0];
+  }
+
+  async bulkCreateClosureSchedules(schedules: InsertClosureSchedule[]): Promise<ClosureSchedule[]> {
+    if (schedules.length === 0) return [];
+    const results = await db.insert(closureSchedules).values(schedules).returning();
+    return results;
   }
 }
 

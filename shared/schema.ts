@@ -72,3 +72,20 @@ export const insertArchivedItemSchema = createInsertSchema(archivedItems, {
 
 export type InsertArchivedItem = z.infer<typeof insertArchivedItemSchema>;
 export type ArchivedItem = typeof archivedItems.$inferSelect;
+
+export const closureSchedules = pgTable("closure_schedules", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // 'cleaning' | 'timeoff'
+  date: text("date").notNull(), // ISO date string
+  location: text("location"), // Only for cleaning
+  createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')`),
+});
+
+export const insertClosureScheduleSchema = createInsertSchema(closureSchedules, {
+  type: z.enum(['cleaning', 'timeoff']),
+  date: z.string(),
+  location: z.string().optional(),
+}).omit({ id: true, createdAt: true });
+
+export type InsertClosureSchedule = z.infer<typeof insertClosureScheduleSchema>;
+export type ClosureSchedule = typeof closureSchedules.$inferSelect;

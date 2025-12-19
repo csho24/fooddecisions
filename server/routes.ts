@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertFoodItemSchema, updateFoodItemSchema, insertArchivedItemSchema } from "@shared/schema";
+import { insertFoodItemSchema, updateFoodItemSchema, insertArchivedItemSchema, insertClosureScheduleSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
 export async function registerRoutes(
@@ -110,6 +110,49 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete archived item" });
+    }
+  });
+
+  app.get("/api/closures", async (req, res) => {
+    try {
+      const schedules = await storage.getClosureSchedules();
+      res.json(schedules);
+    } catch (error) {
+      console.error("Error fetching closure schedules:", error);
+      res.status(500).json({ error: "Failed to fetch closure schedules", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.post("/api/closures", async (req, res) => {
+    try {
+      const { schedules } = req.body;
+      
+      if (Array.isArray(schedules)) {
+        // Bulk create
+        const validations = schedules.map(s => insertClosureScheduleSchema.safeParse(s));
+        const invalidIdx = validations.findIndex(v => !v.success);
+        if (invalidIdx !== -1) {
+          const error = fromZodError(validations[invalidIdx].error!);
+          return res.status(400).json({ error: error.message });
+        }
+        
+        const validatedSchedules = validations.map(v => v.data!);
+        const created = await storage.bulkCreateClosureSchedules(validatedSchedules);
+        return res.status(201).json(created);
+      } else {
+        // Single create
+        const validation = insertClosureScheduleSchema.safeParse(req.body);
+        if (!validation.success) {
+          const error = fromZodError(validation.error);
+          return res.status(400).json({ error: error.message });
+        }
+        
+        const schedule = await storage.createClosureSchedule(validation.data);
+        return res.status(201).json(schedule);
+      }
+    } catch (error) {
+      console.error("Error creating closure schedule:", error);
+      res.status(500).json({ error: "Failed to create closure schedule", details: error instanceof Error ? error.message : String(error) });
     }
   });
 

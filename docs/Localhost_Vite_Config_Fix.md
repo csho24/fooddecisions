@@ -194,6 +194,84 @@ const port = parseInt(process.env.PORT || "8080", 10);
 
 **Status:** ✅ Default port updated to 8080
 
+---
+
+## Update: December 19, 2024 - Dotenv Loading Issue
+
+**Date:** December 19, 2024  
+**Issue:** Database connection failing on localhost - DATABASE_URL not loading from .env file  
+**Symptoms:** 
+- Server starts successfully on port 8080
+- API endpoints return 500 errors
+- Error: `ECONNREFUSED ::1:5432` and `ECONNREFUSED 127.0.0.1:5432`
+- Server trying to connect to localhost PostgreSQL instead of Neon
+
+### Root Cause
+
+The `tsx` command was not properly loading the `.env` file even though `import "dotenv/config"` was at the top of `server/index.ts`. The issue appeared intermittently - code that worked yesterday would fail today without any changes to the codebase.
+
+**Confusing aspects:**
+- No code changes between working version (Dec 18) and broken version (Dec 19)
+- `server/index.ts` had `import "dotenv/config"` at line 1
+- `.env` file existed with correct DATABASE_URL
+- Package.json and package-lock.json were unchanged
+
+### Fix Implemented
+
+**File:** `package.json`
+
+**Before:**
+```json
+"dev": "NODE_ENV=development tsx server/index.ts"
+```
+
+**After:**
+```json
+"dev": "NODE_ENV=development node --import tsx/esm --require dotenv/config server/index.ts"
+```
+
+### Why This Works
+
+- `node --require dotenv/config` explicitly requires dotenv BEFORE any module imports
+- Ensures `.env` is loaded early in the Node.js startup process
+- More reliable than relying on `import "dotenv/config"` within TypeScript files when using tsx
+- The `--import tsx/esm` flag enables TypeScript support via tsx
+
+### Testing
+
+**Before Fix:**
+- ❌ DATABASE_URL not loaded (shown as "NO" in debug logs)
+- ❌ Server tries to connect to localhost:5432
+- ❌ All API requests return 500 errors
+
+**After Fix:**
+- ✅ DATABASE_URL loads correctly
+- ✅ Server connects to Neon PostgreSQL
+- ✅ API endpoints work (foods, archives)
+- ✅ Web preview shows food items correctly
+
+### Why This Issue Occurs Intermittently
+
+**Possible causes:**
+1. **tsx caching behavior:** tsx may cache module resolution and not re-evaluate dotenv imports
+2. **Node.js module loading order:** Timing of when dotenv loads relative to other imports
+3. **Environment-specific:** May depend on shell environment or how npm/node starts
+
+**Prevention:** Using `--require dotenv/config` ensures dotenv loads first, regardless of tsx caching or module loading order.
+
+### Lessons Learned
+
+1. **Explicit is better than implicit:** Use `--require dotenv/config` in the npm script instead of relying on `import "dotenv/config"` in code
+2. **Document environment setup:** .env loading issues are hard to debug when nothing appears to have changed
+3. **Add debug logging:** Adding `console.log('[DEBUG] DATABASE_URL loaded:', ...)` helped identify the issue quickly
+4. **Clean up debug code:** Remove debug logging after fix is verified
+
+### Related Issues
+
+This is similar to the December 9 Vite config issue where async config functions weren't being loaded properly. Both issues involve module loading/import timing problems.
+
+**Status:** ✅ Fixed - December 19, 2024
+
 
 
 
