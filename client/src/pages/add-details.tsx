@@ -19,6 +19,7 @@ import { useSavedLocations } from "@/hooks/use-saved-locations";
 import { Search, ChevronDown, Home, Utensils, Clock, Plus, MapPin, X, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { categorizeFood } from "@/lib/food-categories";
 import {
   Dialog,
   DialogContent,
@@ -86,6 +87,12 @@ export default function AddPage() {
   const [editingLocation, setEditingLocation] = useState<LocationDetail | null>(null);
   const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
   const [isHoursOpen, setIsHoursOpen] = useState(false);
+  
+  // Category State
+  const [availableCategories, setAvailableCategories] = useState<string[]>(['Noodles', 'Rice', 'Ethnic', 'Light', 'Western']);
+  const [isChangeCategoryDialogOpen, setIsChangeCategoryDialogOpen] = useState(false);
+  const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   
   // Delete Confirmation State
   const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
@@ -244,6 +251,39 @@ export default function AddPage() {
       deleteLocation(locationToDelete);
       setLocationToDelete(null);
     }
+  }
+
+  // Category Management Functions
+  function getCurrentCategory(): string {
+    if (!selectedItem) return "Ethnic";
+    // For now, just use the auto-categorization
+    return categorizeFood(selectedItem.name);
+  }
+
+  function handleSelectCategory(categoryName: string) {
+    if (!selectedItem) return;
+    // TODO: When we add database support, save the manual category override
+    toast({ title: "Category Updated", description: `Set to ${categoryName}` });
+    setIsChangeCategoryDialogOpen(false);
+  }
+
+  function handleAddNewCategory() {
+    const trimmedName = newCategoryName.trim();
+    if (!trimmedName) return;
+    
+    // Add to available categories
+    if (!availableCategories.includes(trimmedName)) {
+      setAvailableCategories([...availableCategories, trimmedName]);
+    }
+    
+    // If there's a selected item, assign this new category to it
+    if (selectedItem) {
+      handleSelectCategory(trimmedName);
+    }
+    
+    setNewCategoryName("");
+    setIsAddCategoryDialogOpen(false);
+    toast({ title: "Category Added", description: `${trimmedName} created` });
   }
 
   if (step === 'select') {
@@ -414,6 +454,30 @@ export default function AddPage() {
             </div>
           )}
 
+          {/* Categories Section for Out Items */}
+          {watchType === 'out' && selectedItem && (
+            <div className="space-y-4 border-t pt-4 border-border/50">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">Categories</Label>
+                <Button type="button" size="sm" variant="outline" onClick={() => setIsAddCategoryDialogOpen(true)}>
+                  <Plus size={16} className="mr-1" /> Add Category
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <div 
+                  className="bg-card border rounded-xl p-4 flex justify-between items-center group cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={() => setIsChangeCategoryDialogOpen(true)}
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-lg">{getCurrentCategory()}</div>
+                  </div>
+                  <ChevronDown size={18} className="text-muted-foreground" />
+                </div>
+              </div>
+            </div>
+          )}
+
           <Button type="submit" size="lg" className="w-full h-14 text-lg rounded-xl mt-6 shadow-lg shadow-primary/20">
             Save Changes
           </Button>
@@ -549,6 +613,71 @@ export default function AddPage() {
             <DialogFooter>
                 <Button onClick={() => saveLocation(locationForm.getValues())} className="w-full h-12 rounded-xl">Save Location</Button>
             </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Category Dialog */}
+      <Dialog open={isChangeCategoryDialogOpen} onOpenChange={setIsChangeCategoryDialogOpen}>
+        <DialogContent className="max-w-[90%] w-full rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Change Category</DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="flex flex-wrap gap-2">
+              {availableCategories.map((cat) => {
+                const currentCategory = getCurrentCategory();
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => handleSelectCategory(cat)}
+                    className={cn(
+                      "px-4 py-3 rounded-xl text-sm font-medium transition-all border-2",
+                      currentCategory === cat
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-muted/30 text-foreground border-border hover:border-primary/50"
+                    )}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Category Dialog */}
+      <Dialog open={isAddCategoryDialogOpen} onOpenChange={setIsAddCategoryDialogOpen}>
+        <DialogContent className="max-w-[90%] w-full rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Category</DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Category Name</Label>
+              <Input 
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddNewCategory();
+                  }
+                }}
+                placeholder="e.g. Pizza, Dessert, Drinks..."
+                className="h-12 rounded-xl bg-muted/30"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={handleAddNewCategory} className="w-full h-12 rounded-xl">
+              <Plus size={16} className="mr-2" /> Add Category
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Layout>

@@ -15,9 +15,10 @@ export default function Decide() {
   const [step, setStep] = useState<'type' | 'options'>('type');
   const [selectedType, setSelectedType] = useState<'home' | 'out' | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [outTab, setOutTab] = useState<'location' | 'food'>('location');
+  const [outTab, setOutTab] = useState<'location' | 'food' | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [selectedFoodCategory, setSelectedFoodCategory] = useState<FoodCategory | null>(null);
+  const [selectedFoodFromLocation, setSelectedFoodFromLocation] = useState<string | null>(null);
 
   // Derived state for filtering and sorting
   const groupedItems = useMemo(() => {
@@ -75,20 +76,27 @@ export default function Decide() {
   // Get unique locations from Out items
   const uniqueLocations = useMemo(() => {
     if (selectedType !== 'out') return [];
-    const locations = new Set<string>();
+    const locationMap = new Map<string, string>(); // lowercase key -> display name
     items
       .filter(item => item.type === 'out')
       .forEach(item => {
         if (item.locations && item.locations.length > 0) {
-          item.locations.forEach(loc => locations.add(loc.name));
+          item.locations.forEach(loc => {
+            const normalizedKey = loc.name.trim().toLowerCase();
+            const displayName = loc.name.trim();
+            // Keep the first occurrence's capitalization
+            if (!locationMap.has(normalizedKey)) {
+              locationMap.set(normalizedKey, displayName);
+            }
+          });
         }
       });
-    return Array.from(locations).sort();
+    return Array.from(locationMap.values()).sort();
   }, [items, selectedType]);
 
   // Get items grouped by food category
-  const itemsByFoodCategory = useMemo(() => {
-    if (selectedType !== 'out') return {};
+  const itemsByFoodCategory: Record<FoodCategory, Array<FoodItem & { status: ReturnType<typeof checkAvailability>; foodCategory: FoodCategory }>> = useMemo(() => {
+    if (selectedType !== 'out') return {} as Record<FoodCategory, Array<FoodItem & { status: ReturnType<typeof checkAvailability>; foodCategory: FoodCategory }>>;
     const outItems = items
       .filter(item => item.type === 'out')
       .map(item => ({
@@ -123,6 +131,10 @@ export default function Decide() {
     setSelectedType(type);
     setStep('options');
     setSearchQuery(""); // Clear search when manually selecting type
+    setOutTab(null); // Reset out tab selection
+    setSelectedLocation(null); // Reset location selection
+    setSelectedFoodCategory(null); // Reset food category selection
+    setSelectedFoodFromLocation(null); // Reset food from location selection
   };
 
   const isSearching = searchQuery.trim().length > 0;
@@ -374,36 +386,34 @@ export default function Decide() {
           >
             {selectedType === 'out' ? (
               <>
-                {/* Tabs for Out */}
-                <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-muted/30 rounded-xl shrink-0">
-                  <Button 
-                    variant={outTab === 'location' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    onClick={() => {
-                      setOutTab('location');
-                      setSelectedLocation(null);
-                    }}
-                    className="rounded-lg shadow-none h-10"
-                  >
-                    <MapPin size={16} className="mr-2" />
-                    Location
-                  </Button>
-                  <Button 
-                    variant={outTab === 'food' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    onClick={() => {
-                      setOutTab('food');
-                      setSelectedFoodCategory(null);
-                    }}
-                    className="rounded-lg shadow-none h-10"
-                  >
-                    <Utensils size={16} className="mr-2" />
-                    Food
-                  </Button>
-                </div>
-
                 <ScrollArea className="flex-1 -mx-4 px-4 pb-8">
-                  {outTab === 'location' ? (
+                  {!outTab ? (
+                    <div className="flex flex-col gap-4 h-full justify-center">
+                      <Button 
+                        variant="outline"
+                        className="h-32 text-xl rounded-3xl flex flex-col gap-3 border-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+                        onClick={() => setOutTab('location')}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                          <MapPin size={24} />
+                        </div>
+                        <span>Location</span>
+                        <span className="text-xs font-normal text-muted-foreground">Browse by Area</span>
+                      </Button>
+                      
+                      <Button 
+                        variant="outline"
+                        className="h-32 text-xl rounded-3xl flex flex-col gap-3 border-2 hover:border-orange-500 hover:bg-orange-50 transition-all"
+                        onClick={() => setOutTab('food')}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center">
+                          <Utensils size={24} />
+                        </div>
+                        <span>Food</span>
+                        <span className="text-xs font-normal text-muted-foreground">Browse by Category</span>
+                      </Button>
+                    </div>
+                  ) : outTab === 'location' ? (
                     <>
                       {!selectedLocation ? (
                         <div className="space-y-3">
@@ -427,21 +437,81 @@ export default function Decide() {
                             </div>
                           )}
                         </div>
+                      ) : !selectedFoodFromLocation ? (
+                        <div className="space-y-4">
+                          <Button
+                            variant="ghost"
+                            className="mb-4"
+                            onClick={() => {
+                              setSelectedLocation(null);
+                              setSelectedFoodFromLocation(null);
+                            }}
+                          >
+                            ← Back to Locations
+                          </Button>
+                          <div className="space-y-3">
+                            {itemsByLocation.map(item => (
+                              <Button
+                                key={item.id}
+                                variant="outline"
+                                className="w-full h-16 text-left justify-start rounded-xl"
+                                onClick={() => setSelectedFoodFromLocation(item.name)}
+                              >
+                                <Utensils size={20} className="mr-3 text-primary" />
+                                <span className="text-lg font-medium">{item.name}</span>
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
                       ) : (
                         <div className="space-y-4">
                           <Button
                             variant="ghost"
                             className="mb-4"
-                            onClick={() => setSelectedLocation(null)}
+                            onClick={() => setSelectedFoodFromLocation(null)}
                           >
-                            ← Back to Locations
+                            ← Back to {selectedLocation}
                           </Button>
                           <div className="space-y-2">
                             <h3 className="font-bold text-lg flex items-center gap-2 text-muted-foreground px-1">
-                              <MapPin size={16} />
-                              {selectedLocation}
+                              <Utensils size={16} />
+                              {selectedFoodFromLocation}
                             </h3>
-                            {renderItemsList(itemsByLocation)}
+                            {(() => {
+                              const foodItem = items.find(i => i.name === selectedFoodFromLocation);
+                              if (!foodItem || !foodItem.locations || foodItem.locations.length === 0) {
+                                return <div className="text-muted-foreground text-center py-8">No locations found</div>;
+                              }
+                              return (
+                                <div className="bg-card rounded-2xl border shadow-sm overflow-hidden">
+                                  {foodItem.locations.map((loc, index) => (
+                                    <div 
+                                      key={loc.id}
+                                      className={cn(
+                                        "p-4",
+                                        index !== 0 && "border-t border-border/50"
+                                      )}
+                                    >
+                                      <div className="flex items-start gap-3">
+                                        <MapPin size={18} className="text-primary mt-1" />
+                                        <div className="flex-1">
+                                          <div className="font-semibold text-lg">{loc.name}</div>
+                                          {loc.notes && (
+                                            <p className="text-sm text-muted-foreground mt-1">{loc.notes}</p>
+                                          )}
+                                          {loc.openingHours && (
+                                            <div className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                                              <Clock size={12} />
+                                              {loc.openingHours.open} - {loc.openingHours.close}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       )}
@@ -451,7 +521,7 @@ export default function Decide() {
                       {!selectedFoodCategory ? (
                         <div className="space-y-3">
                           {(['Noodles', 'Rice', 'Ethnic', 'Light', 'Western'] as FoodCategory[]).map(category => {
-                            const categoryItems = itemsByFoodCategory[category] || [];
+                            const categoryItems = (itemsByFoodCategory as any)[category] || [];
                             return (
                               <Button
                                 key={category}
@@ -486,7 +556,7 @@ export default function Decide() {
                               <Utensils size={16} />
                               {selectedFoodCategory}
                             </h3>
-                            {renderItemsList(itemsByFoodCategory[selectedFoodCategory] || [])}
+                            {renderItemsList((itemsByFoodCategory as any)[selectedFoodCategory] || [])}
                           </div>
                         </div>
                       )}
