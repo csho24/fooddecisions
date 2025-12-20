@@ -527,6 +527,30 @@ client/src/
 
 ---
 
+## UI Guidelines & Rules
+
+### Back Button Rule - NEVER HAVE TWO BACK BUTTONS
+
+**Problem:** When adding inline "← Back" buttons in nested flows, they duplicate the header back button from the Layout component.
+
+**Solution:** Use the Layout's `onBack` prop to handle context-aware back navigation:
+
+```tsx
+<Layout showBack title={getTitle()} onBack={handleBack}>
+```
+
+The `handleBack` function should check the current step/state and navigate backwards within the flow, only going to "/" when at the top level.
+
+**DO NOT:**
+- Add inline `← Back` buttons when `showBack` is true on Layout
+- Have two visible back buttons on any screen
+
+**DO:**
+- Use `onBack` prop to customize back behavior
+- Update the title dynamically based on current step
+
+---
+
 ## Related Documentation
 
 - [December 19 Fixes & Solutions](./Dec_19_Fixes_and_Solutions.md) - Specific problems solved

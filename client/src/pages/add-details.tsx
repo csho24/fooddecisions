@@ -297,12 +297,48 @@ export default function AddPage() {
     toast({ title: "Category Added", description: `${trimmedName} created` });
   }
 
+  // Handle back navigation for nested steps
+  const handleBack = () => {
+    if (closureStep === 'expiry') {
+      if (selectedExpiryItem) {
+        setSelectedExpiryItem(null);
+        setExpiryDateInput("");
+      } else if (selectedExpiryCategory) {
+        setSelectedExpiryCategory(null);
+      } else {
+        setClosureStep('main');
+      }
+    } else if (closureStep === 'closure' || closureStep === 'cleaning' || closureStep === 'timeoff') {
+      if (closureStep === 'cleaning' || closureStep === 'timeoff') {
+        setClosureStep('closure');
+      } else {
+        setClosureStep('main');
+      }
+    } else {
+      // At main, go to home
+      setLocation('/');
+    }
+  };
+
+  // Determine title based on current step
+  const getTitle = () => {
+    if (closureStep === 'expiry') {
+      if (selectedExpiryItem) return selectedExpiryItem.name;
+      if (selectedExpiryCategory) return selectedExpiryCategory;
+      return 'Expiry';
+    }
+    if (closureStep === 'cleaning') return 'Cleaning';
+    if (closureStep === 'timeoff') return 'Time Off';
+    if (closureStep === 'closure') return 'Closure';
+    return 'Add Info';
+  };
+
   if (step === 'select') {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     return (
-      <Layout showBack title="Add Info">
+      <Layout showBack title={getTitle()} onBack={handleBack}>
         <div className="space-y-4 h-full flex flex-col">
           {closureStep === 'main' ? (
             <div className="grid grid-cols-1 gap-4">
@@ -491,15 +527,6 @@ export default function AddPage() {
               ) : !selectedExpiryItem ? (
                 // Step 2: Select item from category
                 <div className="space-y-3">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="mb-2"
-                    onClick={() => setSelectedExpiryCategory(null)}
-                  >
-                    ← Back
-                  </Button>
-                  
                   {items.filter(item => item.type === 'home' && item.category === selectedExpiryCategory).length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
                       <p>No {selectedExpiryCategory.toLowerCase()} items found.</p>
@@ -551,17 +578,6 @@ export default function AddPage() {
               ) : (
                 // Step 3: Enter expiry date
                 <div className="space-y-4">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="mb-2"
-                    onClick={() => {
-                      setSelectedExpiryItem(null);
-                      setExpiryDateInput("");
-                    }}
-                  >
-                    ← Back to {selectedExpiryCategory}
-                  </Button>
                   
                   <div className="bg-card border rounded-xl p-4">
                     <h4 className="font-semibold text-lg">{selectedExpiryItem.name}</h4>
