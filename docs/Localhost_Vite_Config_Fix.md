@@ -1,5 +1,23 @@
 # Localhost Development Server Fix - December 9, 2024
 
+## ⚠️ CRITICAL - DO NOT CHANGE THE DEV SCRIPT ⚠️
+
+**The `dev` script in `package.json` MUST be:**
+```json
+"dev": "NODE_ENV=development node --import tsx/esm --require dotenv/config server/index.ts"
+```
+
+**DO NOT change it to:**
+```json
+"dev": "NODE_ENV=development tsx server/index.ts"  // ❌ BROKEN - DATABASE_URL won't load
+```
+
+**Why:** The `--require dotenv/config` flag is REQUIRED to load the `.env` file properly. Without it, the DATABASE_URL doesn't load and the app connects to localhost:5432 instead of Neon, causing all API calls to fail.
+
+**This has broken localhost 3+ times. DO NOT REVERT.**
+
+---
+
 **Date:** December 9, 2024  
 **Issue:** Localhost web preview not working - Vite dev server crashing  
 **Status:** ✅ Resolved
