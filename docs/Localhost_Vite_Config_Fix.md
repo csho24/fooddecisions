@@ -290,6 +290,74 @@ This is similar to the December 9 Vite config issue where async config functions
 
 **Status:** ✅ Fixed - December 19, 2024
 
+---
+
+## Update: December 20, 2024 - Missing Database Migration
+
+**Date:** December 20, 2024  
+**Issue:** Localhost content not loading - API returning 500 errors  
+**Symptoms:**
+- Server starts successfully on port 8080
+- Health endpoint works (`/health` returns OK)
+- Frontend HTML loads
+- BUT all API calls fail with 500 error
+- Error: `column "expiry_date" does not exist`
+
+### Root Cause
+
+When adding the **Expiry feature**, the schema was updated to include `expiryDate` field:
+- `shared/schema.ts` - Added `expiryDate: text("expiry_date")` to foodItems table
+- `client/src/lib/store.ts` - Added `expiryDate?: string` to FoodItem interface
+- `server/migrations/003_add_expiry_date.sql` - Created migration file
+
+**BUT the migration was never run against the Neon database.** The column didn't exist in the actual database, so every SELECT query on `food_items` failed.
+
+### Why This Was Missed
+
+1. Schema file was updated ✅
+2. Migration SQL file was created ✅
+3. **Database migration was NOT executed** ❌
+
+The `drizzle-kit push` command requires interactive confirmation and wasn't run after adding the new column.
+
+### Fix Implemented
+
+Ran the SQL directly against Neon:
+
+```sql
+ALTER TABLE food_items ADD COLUMN IF NOT EXISTS expiry_date TEXT;
+```
+
+### Verification
+
+```bash
+# Check column exists
+psql "$DATABASE_URL" -c "SELECT column_name FROM information_schema.columns WHERE table_name = 'food_items';"
+
+# Test API
+curl http://localhost:8080/api/foods  # Returns data ✅
+```
+
+### Lessons Learned
+
+1. **Always run migrations after schema changes:** After adding columns to `shared/schema.ts`, MUST run `npx drizzle-kit push` or direct SQL
+2. **Test the API endpoint:** Don't just check if server starts - verify `/api/foods` actually returns data
+3. **Check error messages carefully:** The error `column "expiry_date" does not exist` was the real issue, not dotenv loading
+4. **Schema changes require 2 steps:**
+   - Update `shared/schema.ts` (code)
+   - Run migration (database)
+
+### Prevention Checklist
+
+When adding new database columns:
+- [ ] Update `shared/schema.ts`
+- [ ] Update `client/src/lib/store.ts` types
+- [ ] Create migration file in `server/migrations/`
+- [ ] **RUN THE MIGRATION:** `npx drizzle-kit push` or direct SQL
+- [ ] Test API endpoint returns data
+
+**Status:** ✅ Fixed - December 20, 2024
+
 
 
 
