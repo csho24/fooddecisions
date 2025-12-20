@@ -21,3 +21,5 @@ INSERT INTO categories (name) VALUES
   ('Western')
 ON CONFLICT (name) DO NOTHING;
 
+
+

@@ -15,3 +15,5 @@ CREATE INDEX IF NOT EXISTS idx_closure_schedules_date ON closure_schedules(date)
 -- Create index for faster lookups by type
 CREATE INDEX IF NOT EXISTS idx_closure_schedules_type ON closure_schedules(type);
 
+
+
