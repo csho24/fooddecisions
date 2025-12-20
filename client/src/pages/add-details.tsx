@@ -378,7 +378,6 @@ export default function AddPage() {
                     <Sparkles size={24} />
                   </div>
                   <span>Cleaning</span>
-                  <span className="text-xs font-normal text-muted-foreground">Select cleaning days</span>
                 </Button>
                 
                 <Button 
@@ -390,7 +389,6 @@ export default function AddPage() {
                     <CalendarIcon size={24} />
                   </div>
                   <span>Time Off</span>
-                  <span className="text-xs font-normal text-muted-foreground">Schedule future closures</span>
                 </Button>
               </div>
             </div>

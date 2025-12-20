@@ -551,6 +551,71 @@ The `handleBack` function should check the current step/state and navigate backw
 
 ---
 
+### Sub-descriptions on Buttons - DO NOT ADD WITHOUT ASKING
+
+**DO NOT add sub-description text under button labels** like:
+```tsx
+// ❌ DON'T DO THIS
+<span>Cleaning</span>
+<span className="text-xs text-muted-foreground">Select cleaning days</span>
+```
+
+**Only the main label is needed:**
+```tsx
+// ✅ DO THIS
+<span>Cleaning</span>
+```
+
+Sub-descriptions are ONLY allowed when the user explicitly provides them.
+
+---
+
+## Database Migrations - MUST RUN SQL MANUALLY
+
+When adding new database columns, the SQL must be run manually in Neon console.
+
+### Expiry Date Column (Dec 20, 2024)
+```sql
+ALTER TABLE food_items ADD COLUMN IF NOT EXISTS expiry_date TEXT;
+```
+
+### All Required Tables
+```sql
+-- Food Items table
+CREATE TABLE IF NOT EXISTS food_items (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  category TEXT,
+  notes TEXT,
+  expiry_date TEXT,
+  locations JSONB
+);
+
+-- Archived Items table  
+CREATE TABLE IF NOT EXISTS archived_items (
+  id SERIAL PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT,
+  status TEXT NOT NULL,
+  archived_at TEXT NOT NULL
+);
+
+-- Closure Schedules table
+CREATE TABLE IF NOT EXISTS closure_schedules (
+  id SERIAL PRIMARY KEY,
+  type TEXT NOT NULL,
+  date TEXT NOT NULL,
+  location TEXT,
+  created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+);
+```
+
+**IMPORTANT:** After updating `shared/schema.ts`, YOU MUST run the SQL in Neon console. The migration files in `server/migrations/` are reference only - they don't auto-run.
+
+---
+
 ## Related Documentation
 
 - [December 19 Fixes & Solutions](./Dec_19_Fixes_and_Solutions.md) - Specific problems solved
