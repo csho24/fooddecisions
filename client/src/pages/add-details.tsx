@@ -314,7 +314,7 @@ export default function AddPage() {
                   <CalendarIcon size={24} />
                 </div>
                 <span>Closure</span>
-                <span className="text-xs font-normal text-muted-foreground">Manage store schedule</span>
+                <span className="text-xs font-normal text-muted-foreground">When is your fave stall closed?</span>
               </Button>
               
               <Button 
@@ -326,7 +326,7 @@ export default function AddPage() {
                   <Clock size={24} />
                 </div>
                 <span>Expiry</span>
-                <span className="text-xs font-normal text-muted-foreground">Track home food expiry dates</span>
+                <span className="text-xs font-normal text-muted-foreground">Be reminded before food expires!</span>
               </Button>
             </div>
           ) : closureStep === 'closure' ? (
@@ -474,54 +474,52 @@ export default function AddPage() {
                       <p className="text-sm mt-2">Add some items to your Home list first.</p>
                     </div>
                   ) : (
-                    <ScrollArea className="h-[400px]">
-                      <div className="space-y-2 pr-4">
-                        {items.filter(item => item.type === 'home').map(item => {
-                          // Calculate days remaining if expiry exists
-                          let daysRemaining: number | null = null;
-                          if (item.expiryDate) {
-                            const expiry = new Date(item.expiryDate);
-                            const now = new Date();
-                            now.setHours(0, 0, 0, 0);
-                            expiry.setHours(0, 0, 0, 0);
-                            daysRemaining = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                          }
-                          
-                          return (
-                            <Button
-                              key={item.id}
-                              type="button"
-                              variant="outline"
-                              className="w-full h-auto py-4 text-left justify-between rounded-xl"
-                              onClick={() => {
-                                setSelectedExpiryItem(item);
-                                setExpiryDateInput(item.expiryDate || "");
-                              }}
-                            >
-                              <div className="flex flex-col items-start">
-                                <span className="text-lg font-medium">{item.name}</span>
-                                {item.category && (
-                                  <span className="text-xs text-muted-foreground">{item.category}</span>
-                                )}
-                              </div>
-                              {daysRemaining !== null && (
-                                <span className={cn(
-                                  "text-sm font-medium px-2 py-1 rounded-lg",
-                                  daysRemaining < 0 ? "bg-red-100 text-red-700" :
-                                  daysRemaining === 0 ? "bg-orange-100 text-orange-700" :
-                                  daysRemaining <= 2 ? "bg-yellow-100 text-yellow-700" :
-                                  "bg-green-100 text-green-700"
-                                )}>
-                                  {daysRemaining < 0 ? `${Math.abs(daysRemaining)}d ago` :
-                                   daysRemaining === 0 ? "Today!" :
-                                   `${daysRemaining}d left`}
-                                </span>
+                    <div className="space-y-1.5">
+                      {items.filter(item => item.type === 'home').map(item => {
+                        // Calculate days remaining if expiry exists
+                        let daysRemaining: number | null = null;
+                        if (item.expiryDate) {
+                          const expiry = new Date(item.expiryDate);
+                          const now = new Date();
+                          now.setHours(0, 0, 0, 0);
+                          expiry.setHours(0, 0, 0, 0);
+                          daysRemaining = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        }
+                        
+                        return (
+                          <Button
+                            key={item.id}
+                            type="button"
+                            variant="outline"
+                            className="w-full h-auto py-2.5 px-3 text-left justify-between rounded-lg text-sm"
+                            onClick={() => {
+                              setSelectedExpiryItem(item);
+                              setExpiryDateInput(item.expiryDate || "");
+                            }}
+                          >
+                            <div className="flex flex-col items-start">
+                              <span className="font-medium">{item.name}</span>
+                              {item.category && (
+                                <span className="text-[10px] text-muted-foreground">{item.category}</span>
                               )}
-                            </Button>
-                          );
-                        })}
-                      </div>
-                    </ScrollArea>
+                            </div>
+                            {daysRemaining !== null && (
+                              <span className={cn(
+                                "text-xs font-medium px-1.5 py-0.5 rounded",
+                                daysRemaining < 0 ? "bg-red-100 text-red-700" :
+                                daysRemaining === 0 ? "bg-orange-100 text-orange-700" :
+                                daysRemaining <= 2 ? "bg-yellow-100 text-yellow-700" :
+                                "bg-green-100 text-green-700"
+                              )}>
+                                {daysRemaining < 0 ? `${Math.abs(daysRemaining)}d ago` :
+                                 daysRemaining === 0 ? "Today!" :
+                                 `${daysRemaining}d left`}
+                              </span>
+                            )}
+                          </Button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               ) : (
