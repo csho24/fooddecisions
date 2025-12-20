@@ -90,6 +90,7 @@ export default function AddPage() {
   const [cleaningLocation, setCleaningLocation] = useState("");
   
   // Expiry State
+  const [selectedExpiryCategory, setSelectedExpiryCategory] = useState<'Fridge' | 'Snacks' | null>(null);
   const [selectedExpiryItem, setSelectedExpiryItem] = useState<FoodItem | null>(null);
   const [expiryDateInput, setExpiryDateInput] = useState("");
   
@@ -462,20 +463,50 @@ export default function AddPage() {
             </div>
           ) : closureStep === 'expiry' ? (
             <div className="space-y-4">
-              <h3 className="font-bold text-lg">Set Expiry Date</h3>
-              
-              {!selectedExpiryItem ? (
-                // Step 1: Select a home food item
+              {!selectedExpiryCategory ? (
+                // Step 1: Select category (Fridge or Snacks)
+                <div className="grid grid-cols-1 gap-4">
+                  <Button 
+                    variant="outline"
+                    className="h-28 text-xl rounded-3xl flex flex-col gap-2 border-2 hover:border-blue-500 hover:bg-blue-50 transition-all"
+                    onClick={() => setSelectedExpiryCategory('Fridge')}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                      <Home size={20} />
+                    </div>
+                    <span>Fridge</span>
+                  </Button>
+                  
+                  <Button 
+                    variant="outline"
+                    className="h-28 text-xl rounded-3xl flex flex-col gap-2 border-2 hover:border-amber-500 hover:bg-amber-50 transition-all"
+                    onClick={() => setSelectedExpiryCategory('Snacks')}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                      <Utensils size={20} />
+                    </div>
+                    <span>Snacks</span>
+                  </Button>
+                </div>
+              ) : !selectedExpiryItem ? (
+                // Step 2: Select item from category
                 <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">Select a home food item:</p>
-                  {items.filter(item => item.type === 'home').length === 0 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mb-2"
+                    onClick={() => setSelectedExpiryCategory(null)}
+                  >
+                    ← Back
+                  </Button>
+                  
+                  {items.filter(item => item.type === 'home' && item.category === selectedExpiryCategory).length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
-                      <p>No home items found.</p>
-                      <p className="text-sm mt-2">Add some items to your Home list first.</p>
+                      <p>No {selectedExpiryCategory.toLowerCase()} items found.</p>
                     </div>
                   ) : (
                     <div className="space-y-1.5">
-                      {items.filter(item => item.type === 'home').map(item => {
+                      {items.filter(item => item.type === 'home' && item.category === selectedExpiryCategory).map(item => {
                         // Calculate days remaining if expiry exists
                         let daysRemaining: number | null = null;
                         if (item.expiryDate) {
@@ -497,12 +528,7 @@ export default function AddPage() {
                               setExpiryDateInput(item.expiryDate || "");
                             }}
                           >
-                            <div className="flex flex-col items-start">
-                              <span className="font-medium">{item.name}</span>
-                              {item.category && (
-                                <span className="text-[10px] text-muted-foreground">{item.category}</span>
-                              )}
-                            </div>
+                            <span className="font-medium">{item.name}</span>
                             {daysRemaining !== null && (
                               <span className={cn(
                                 "text-xs font-medium px-1.5 py-0.5 rounded",
@@ -523,7 +549,7 @@ export default function AddPage() {
                   )}
                 </div>
               ) : (
-                // Step 2: Enter expiry date
+                // Step 3: Enter expiry date
                 <div className="space-y-4">
                   <Button
                     type="button"
@@ -534,7 +560,7 @@ export default function AddPage() {
                       setExpiryDateInput("");
                     }}
                   >
-                    ← Back to Items
+                    ← Back to {selectedExpiryCategory}
                   </Button>
                   
                   <div className="bg-card border rounded-xl p-4">
