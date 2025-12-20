@@ -19,5 +19,15 @@ export interface FoodItem {
   type: FoodType;
   category?: string;
   notes?: string;
+  expiryDate?: string;
   locations?: LocationDetail[];
+}
+
+export interface ArchivedItem {
+  id: string;
+  itemId: string;
+  name: string;
+  category?: string;
+  status: 'eaten' | 'thrown';
+  archivedAt: string;
 }

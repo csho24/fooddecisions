@@ -31,309 +31,362 @@ const DAYS = [
   { id: 0, label: 'S' },
 ];
 
+type MainStep = 'main' | 'closure' | 'expiry';
+type ExpiryStep = 'category' | 'items' | 'date';
+
 export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps) {
-  const { items, fetchItems, updateItem, removeItem } = useFoodStore();
-  const [activeTab, setActiveTab] = useState<FoodType>('home');
-  const [selectedItem, setSelectedItem] = useState<FoodItem | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { items, fetchItems, updateItem } = useFoodStore();
   
-  const [locationModalVisible, setLocationModalVisible] = useState(false);
-  const [editingLocation, setEditingLocation] = useState<LocationDetail | null>(null);
-  const [locationName, setLocationName] = useState('');
-  const [hasHours, setHasHours] = useState(false);
-  const [openTime, setOpenTime] = useState('09:00');
-  const [closeTime, setCloseTime] = useState('21:00');
-  const [closedDays, setClosedDays] = useState<number[]>([]);
+  // Main navigation state
+  const [mainStep, setMainStep] = useState<MainStep>('main');
+  
+  // Expiry state
+  const [expiryStep, setExpiryStep] = useState<ExpiryStep>('category');
+  const [selectedExpiryCategory, setSelectedExpiryCategory] = useState<'Fridge' | 'Snacks' | null>(null);
+  const [selectedExpiryItem, setSelectedExpiryItem] = useState<FoodItem | null>(null);
+  const [expiryDateInput, setExpiryDateInput] = useState('');
 
   useEffect(() => {
     fetchItems();
   }, []);
 
-  useEffect(() => {
-    if (route.params?.itemId) {
-      const item = items.find(i => i.id === route.params.itemId);
-      if (item) {
-        setSelectedItem(item);
-        setActiveTab(item.type);
+  // Get title based on current step
+  const getTitle = () => {
+    if (mainStep === 'expiry') {
+      if (selectedExpiryItem) return selectedExpiryItem.name;
+      if (selectedExpiryCategory) return selectedExpiryCategory;
+      return 'Expiry';
+    }
+    if (mainStep === 'closure') return 'Closure';
+    return 'Add Info';
+  };
+
+  // Handle back navigation
+  const handleBack = () => {
+    if (mainStep === 'expiry') {
+      if (selectedExpiryItem) {
+        setSelectedExpiryItem(null);
+        setExpiryDateInput('');
+      } else if (selectedExpiryCategory) {
+        setSelectedExpiryCategory(null);
+      } else {
+        setMainStep('main');
+      }
+    } else if (mainStep === 'closure') {
+      setMainStep('main');
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  // Format expiry date input
+  const formatExpiryInput = (text: string) => {
+    let value = text.replace(/\D/g, '');
+    if (value.length >= 2) {
+      value = value.slice(0, 2) + '/' + value.slice(2);
+    }
+    if (value.length >= 5) {
+      value = value.slice(0, 5) + '/' + value.slice(5, 9);
+    }
+    return value;
+  };
+
+  // Calculate days remaining
+  const getDaysRemaining = (expiryDate: string): number | null => {
+    if (!expiryDate) return null;
+    const expiry = new Date(expiryDate);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+    return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // Save expiry date
+  const saveExpiryDate = async () => {
+    if (!selectedExpiryItem || expiryDateInput.length !== 10) return;
+    
+    const parts = expiryDateInput.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0]);
+      const month = parseInt(parts[1]) - 1;
+      const year = parseInt(parts[2]);
+      const isoDate = new Date(year, month, day).toISOString().split('T')[0];
+      
+      try {
+        await updateItem(selectedExpiryItem.id, { expiryDate: isoDate });
+        Alert.alert('Saved!', `${selectedExpiryItem.name} expires on ${expiryDateInput}`);
+        setSelectedExpiryItem(null);
+        setExpiryDateInput('');
+      } catch (error) {
+        Alert.alert('Error', 'Failed to save expiry date');
       }
     }
-  }, [route.params?.itemId, items]);
-
-  const filteredItems = items.filter(
-    item => item.type === activeTab && item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const openLocationModal = (location?: LocationDetail) => {
-    if (location) {
-      setEditingLocation(location);
-      setLocationName(location.name);
-      setHasHours(!!location.openingHours);
-      setOpenTime(location.openingHours?.open || '09:00');
-      setCloseTime(location.openingHours?.close || '21:00');
-      setClosedDays(location.closedDays || []);
-    } else {
-      setEditingLocation(null);
-      setLocationName('');
-      setHasHours(false);
-      setOpenTime('09:00');
-      setCloseTime('21:00');
-      setClosedDays([]);
-    }
-    setLocationModalVisible(true);
   };
 
-  const saveLocation = async () => {
-    if (!selectedItem || !locationName.trim()) return;
-
-    const newLocation: LocationDetail = {
-      id: editingLocation?.id || Math.random().toString(36).substr(2, 9),
-      name: locationName.trim(),
-      openingHours: hasHours ? { open: openTime, close: closeTime } : undefined,
-      closedDays: closedDays.length > 0 ? closedDays : undefined,
-    };
-
-    let updatedLocations = selectedItem.locations || [];
-    if (editingLocation) {
-      updatedLocations = updatedLocations.map(l => l.id === editingLocation.id ? newLocation : l);
-    } else {
-      updatedLocations = [...updatedLocations, newLocation];
-    }
-
-    try {
-      await updateItem(selectedItem.id, { locations: updatedLocations });
-      setSelectedItem({ ...selectedItem, locations: updatedLocations });
-      setLocationModalVisible(false);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save location');
-    }
-  };
-
-  const deleteLocation = (locationId: string) => {
-    Alert.alert(
-      'Delete Location',
-      'Are you sure you want to remove this location?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            if (!selectedItem) return;
-            const updatedLocations = (selectedItem.locations || []).filter(l => l.id !== locationId);
-            await updateItem(selectedItem.id, { locations: updatedLocations });
-            setSelectedItem({ ...selectedItem, locations: updatedLocations });
-          },
-        },
-      ]
-    );
-  };
-
-  const toggleClosedDay = (dayId: number) => {
-    if (closedDays.includes(dayId)) {
-      setClosedDays(closedDays.filter(d => d !== dayId));
-    } else {
-      setClosedDays([...closedDays, dayId]);
-    }
-  };
-
-  if (selectedItem) {
+  // Main screen with Closure and Expiry cards
+  if (mainStep === 'main') {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSelectedItem(null)}>
+          <TouchableOpacity onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color="#111827" />
           </TouchableOpacity>
-          <Text style={styles.title}>Edit Info</Text>
+          <Text style={styles.title}>{getTitle()}</Text>
           <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView style={styles.content}>
-          <Text style={styles.itemName}>{selectedItem.name}</Text>
-
-          {selectedItem.type === 'out' && (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Locations</Text>
-                <TouchableOpacity style={styles.addLocationBtn} onPress={() => openLocationModal()}>
-                  <Ionicons name="add" size={18} color="#FFFFFF" />
-                  <Text style={styles.addLocationText}>Add</Text>
-                </TouchableOpacity>
-              </View>
-
-              {selectedItem.locations?.map(loc => (
-                <View key={loc.id} style={styles.locationCard}>
-                  <TouchableOpacity style={styles.locationInfo} onPress={() => openLocationModal(loc)}>
-                    <Text style={styles.locationName}>{loc.name}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => deleteLocation(loc.id)}>
-                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              {(!selectedItem.locations || selectedItem.locations.length === 0) && (
-                <View style={styles.emptyLocations}>
-                  <Text style={styles.emptyText}>No locations added yet</Text>
-                </View>
-              )}
+        <View style={styles.cardsContainer}>
+          <TouchableOpacity
+            style={styles.mainCard}
+            onPress={() => setMainStep('closure')}
+          >
+            <View style={[styles.cardIcon, { backgroundColor: '#F3E8FF' }]}>
+              <Ionicons name="calendar" size={28} color="#9333EA" />
             </View>
-          )}
+            <Text style={styles.cardTitle}>Closure</Text>
+            <Text style={styles.cardSubtitle}>When is your fave stall closed?</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => {
-              Alert.alert('Delete Food', `Delete "${selectedItem.name}"?`, [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete',
-                  style: 'destructive',
-                  onPress: async () => {
-                    await removeItem(selectedItem.id);
-                    setSelectedItem(null);
-                  },
-                },
-              ]);
-            }}
+            style={styles.mainCard}
+            onPress={() => setMainStep('expiry')}
           >
-            <Text style={styles.deleteButtonText}>Delete Food Item</Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        <Modal visible={locationModalVisible} animationType="slide" presentationStyle="pageSheet">
-          <SafeAreaView style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setLocationModalVisible(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>{editingLocation ? 'Edit Location' : 'Add Location'}</Text>
-              <TouchableOpacity onPress={saveLocation}>
-                <Text style={styles.saveText}>Save</Text>
-              </TouchableOpacity>
+            <View style={[styles.cardIcon, { backgroundColor: '#FFE4E6' }]}>
+              <Ionicons name="time" size={28} color="#E11D48" />
             </View>
-
-            <ScrollView style={styles.modalContent}>
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Location</Text>
-                <TextInput
-                  style={styles.input}
-                  value={locationName}
-                  onChangeText={setLocationName}
-                  placeholder="e.g. Maxwell or Bedok"
-                />
-              </View>
-
-              <View style={styles.switchRow}>
-                <Text style={styles.label}>Specific Opening Hours</Text>
-                <Switch value={hasHours} onValueChange={setHasHours} />
-              </View>
-
-              {hasHours && (
-                <View style={styles.hoursContainer}>
-                  <View style={styles.timeInputGroup}>
-                    <Text style={styles.timeLabel}>Opens</Text>
-                    <TextInput
-                      style={styles.timeInput}
-                      value={openTime}
-                      onChangeText={setOpenTime}
-                      placeholder="09:00"
-                    />
-                  </View>
-                  <Text style={styles.timeSeparator}>-</Text>
-                  <View style={styles.timeInputGroup}>
-                    <Text style={styles.timeLabel}>Closes</Text>
-                    <TextInput
-                      style={styles.timeInput}
-                      value={closeTime}
-                      onChangeText={setCloseTime}
-                      placeholder="21:00"
-                    />
-                  </View>
-                </View>
-              )}
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Days Closed</Text>
-                <View style={styles.daysRow}>
-                  {DAYS.map(day => (
-                    <TouchableOpacity
-                      key={day.id}
-                      style={[styles.dayButton, closedDays.includes(day.id) && styles.dayButtonActive]}
-                      onPress={() => toggleClosedDay(day.id)}
-                    >
-                      <Text style={[styles.dayText, closedDays.includes(day.id) && styles.dayTextActive]}>
-                        {day.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </ScrollView>
-          </SafeAreaView>
-        </Modal>
+            <Text style={styles.cardTitle}>Expiry</Text>
+            <Text style={styles.cardSubtitle}>Be reminded before food expires!</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Add Info</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'home' && styles.activeTab]}
-          onPress={() => setActiveTab('home')}
-        >
-          <Ionicons name="home" size={18} color={activeTab === 'home' ? '#FFFFFF' : '#6B7280'} />
-          <Text style={[styles.tabText, activeTab === 'home' && styles.activeTabText]}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'out' && styles.activeTab]}
-          onPress={() => setActiveTab('out')}
-        >
-          <Ionicons name="restaurant" size={18} color={activeTab === 'out' ? '#FFFFFF' : '#6B7280'} />
-          <Text style={[styles.tabText, activeTab === 'out' && styles.activeTabText]}>Out</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={18} color="#6B7280" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={`Search ${activeTab}...`}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
-      <FlatList
-        data={filteredItems}
-        keyExtractor={item => item.id}
-        style={styles.list}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.itemRow} onPress={() => setSelectedItem(item)}>
-            <View>
-              <Text style={styles.itemText}>{item.name}</Text>
-              {item.type === 'out' && item.locations && item.locations.length > 0 && (
-                <Text style={styles.locationCount}>{item.locations.length} Locations</Text>
-              )}
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+  // Closure screen (placeholder - can be expanded)
+  if (mainStep === 'closure') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
           </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No items found</Text>
+          <Text style={styles.title}>{getTitle()}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <View style={styles.cardsContainer}>
+          <TouchableOpacity style={styles.mainCard}>
+            <View style={[styles.cardIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Ionicons name="sparkles" size={28} color="#2563EB" />
+            </View>
+            <Text style={styles.cardTitle}>Cleaning</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.mainCard}>
+            <View style={[styles.cardIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="calendar" size={28} color="#D97706" />
+            </View>
+            <Text style={styles.cardTitle}>Time Off</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Expiry flow
+  if (mainStep === 'expiry') {
+    // Step 1: Select category (Fridge or Snacks)
+    if (!selectedExpiryCategory) {
+      return (
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color="#111827" />
+            </TouchableOpacity>
+            <Text style={styles.title}>{getTitle()}</Text>
+            <View style={{ width: 24 }} />
           </View>
+
+          <View style={styles.cardsContainer}>
+            <TouchableOpacity
+              style={styles.categoryCard}
+              onPress={() => setSelectedExpiryCategory('Fridge')}
+            >
+              <View style={[styles.cardIcon, { backgroundColor: '#DBEAFE' }]}>
+                <Ionicons name="home" size={24} color="#2563EB" />
+              </View>
+              <Text style={styles.cardTitle}>Fridge</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.categoryCard}
+              onPress={() => setSelectedExpiryCategory('Snacks')}
+            >
+              <View style={[styles.cardIcon, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="restaurant" size={24} color="#D97706" />
+              </View>
+              <Text style={styles.cardTitle}>Snacks</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      );
+    }
+
+    // Step 2: Select item from category
+    if (!selectedExpiryItem) {
+      const categoryItems = items.filter(
+        item => item.type === 'home' && item.category === selectedExpiryCategory
+      );
+
+      return (
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color="#111827" />
+            </TouchableOpacity>
+            <Text style={styles.title}>{getTitle()}</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          <FlatList
+            data={categoryItems}
+            keyExtractor={item => item.id}
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => {
+              const daysRemaining = getDaysRemaining(item.expiryDate || '');
+              return (
+                <TouchableOpacity
+                  style={styles.itemRow}
+                  onPress={() => {
+                    setSelectedExpiryItem(item);
+                    setExpiryDateInput(item.expiryDate || '');
+                  }}
+                >
+                  <Text style={styles.itemText}>{item.name}</Text>
+                  {daysRemaining !== null && (
+                    <View style={[
+                      styles.expiryBadge,
+                      daysRemaining < 0 ? styles.expiredBadge :
+                      daysRemaining === 0 ? styles.todayBadge :
+                      daysRemaining <= 2 ? styles.soonBadge : styles.okBadge
+                    ]}>
+                      <Text style={[
+                        styles.expiryBadgeText,
+                        daysRemaining < 0 ? styles.expiredText :
+                        daysRemaining === 0 ? styles.todayText :
+                        daysRemaining <= 2 ? styles.soonText : styles.okText
+                      ]}>
+                        {daysRemaining < 0 ? `${Math.abs(daysRemaining)}d ago` :
+                         daysRemaining === 0 ? 'Today!' :
+                         `${daysRemaining}d left`}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No {selectedExpiryCategory?.toLowerCase()} items found.</Text>
+              </View>
+            }
+          />
+        </SafeAreaView>
+      );
+    }
+
+    // Step 3: Enter expiry date
+    const previewDays = expiryDateInput.length === 10 ? (() => {
+      const parts = expiryDateInput.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1;
+        const year = parseInt(parts[2]);
+        const expiry = new Date(year, month, day);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        expiry.setHours(0, 0, 0, 0);
+        if (!isNaN(expiry.getTime())) {
+          return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         }
-      />
-    </SafeAreaView>
-  );
+      }
+      return null;
+    })() : null;
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.title}>{getTitle()}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <View style={styles.dateContainer}>
+          <Text style={styles.dateLabel}>Expiry Date (DD/MM/YYYY)</Text>
+          <TextInput
+            style={styles.dateInput}
+            value={expiryDateInput}
+            onChangeText={(text) => setExpiryDateInput(formatExpiryInput(text))}
+            placeholder="e.g. 25/12/2024"
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+
+          {previewDays !== null && (
+            <View style={[
+              styles.previewBox,
+              previewDays < 0 ? styles.expiredBg :
+              previewDays === 0 ? styles.todayBg :
+              previewDays <= 2 ? styles.soonBg : styles.okBg
+            ]}>
+              <Text style={[
+                styles.previewText,
+                previewDays < 0 ? styles.expiredText :
+                previewDays === 0 ? styles.todayText :
+                previewDays <= 2 ? styles.soonText : styles.okText
+              ]}>
+                {previewDays < 0 ? `Expired ${Math.abs(previewDays)} days ago` :
+                 previewDays === 0 ? 'Expires today!' :
+                 previewDays === 1 ? 'Expires tomorrow!' :
+                 `${previewDays} days remaining`}
+              </Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.saveButton, expiryDateInput.length !== 10 && styles.saveButtonDisabled]}
+            onPress={saveExpiryDate}
+            disabled={expiryDateInput.length !== 10}
+          >
+            <Text style={styles.saveButtonText}>Save Expiry Date</Text>
+          </TouchableOpacity>
+
+          {selectedExpiryItem.expiryDate && (
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={async () => {
+                try {
+                  await updateItem(selectedExpiryItem.id, { expiryDate: undefined });
+                  Alert.alert('Cleared', 'Expiry date removed.');
+                  setSelectedExpiryItem(null);
+                  setExpiryDateInput('');
+                } catch (error) {
+                  console.error('Error clearing expiry date:', error);
+                }
+              }}
+            >
+              <Text style={styles.clearButtonText}>Clear Expiry Date</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return null;
 }
 
 const styles = StyleSheet.create({
@@ -353,131 +406,52 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
   },
-  content: {
+  cardsContainer: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    gap: 16,
   },
-  itemName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 24,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  addLocationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#111827',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    gap: 4,
-  },
-  addLocationText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  locationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  mainCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  locationInfo: {
-    flex: 1,
-  },
-  locationName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-  },
-  emptyLocations: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
+    borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#D1D5DB',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    gap: 12,
   },
-  deleteButton: {
-    backgroundColor: '#FEE2E2',
-    borderRadius: 12,
-    padding: 16,
+  categoryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
     alignItems: 'center',
-    marginTop: 24,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    gap: 8,
   },
-  deleteButtonText: {
-    color: '#DC2626',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tabs: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
+  cardIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 6,
   },
-  activeTab: {
-    backgroundColor: '#111827',
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
   },
-  tabText: {
+  cardSubtitle: {
     fontSize: 14,
-    fontWeight: '600',
     color: '#6B7280',
-  },
-  activeTabText: {
-    color: '#FFFFFF',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    fontSize: 16,
   },
   list: {
     flex: 1,
+  },
+  listContent: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 8,
   },
   itemRow: {
     flexDirection: 'row',
@@ -485,7 +459,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -494,12 +469,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#111827',
+    flex: 1,
   },
-  locationCount: {
+  expiryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  expiredBadge: { backgroundColor: '#FEE2E2' },
+  todayBadge: { backgroundColor: '#FFEDD5' },
+  soonBadge: { backgroundColor: '#FEF9C3' },
+  okBadge: { backgroundColor: '#DCFCE7' },
+  expiryBadgeText: {
     fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
+    fontWeight: '500',
   },
+  expiredText: { color: '#DC2626' },
+  todayText: { color: '#EA580C' },
+  soonText: { color: '#CA8A04' },
+  okText: { color: '#16A34A' },
   emptyState: {
     paddingVertical: 48,
     alignItems: 'center',
@@ -508,113 +496,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
   },
-  modalContainer: {
+  dateContainer: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 24,
+    paddingTop: 16,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  cancelText: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  saveText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
-  modalContent: {
-    flex: 1,
-    padding: 16,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  label: {
+  dateLabel: {
     fontSize: 14,
     fontWeight: '500',
     color: '#374151',
     marginBottom: 8,
   },
-  input: {
+  dateInput: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    fontSize: 24,
+    textAlign: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  previewBox: {
+    marginTop: 16,
+    padding: 20,
+    borderRadius: 16,
     alignItems: 'center',
-    marginBottom: 20,
   },
-  hoursContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 8,
-  },
-  timeInputGroup: {
-    flex: 1,
-  },
-  timeLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  timeInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  timeSeparator: {
+  expiredBg: { backgroundColor: '#FEE2E2' },
+  todayBg: { backgroundColor: '#FFEDD5' },
+  soonBg: { backgroundColor: '#FEF9C3' },
+  okBg: { backgroundColor: '#DCFCE7' },
+  previewText: {
     fontSize: 18,
-    color: '#6B7280',
-    paddingTop: 16,
+    fontWeight: '600',
   },
-  daysRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  dayButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+  saveButton: {
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    paddingVertical: 18,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    marginTop: 24,
   },
-  dayButtonActive: {
-    backgroundColor: '#EF4444',
-    borderColor: '#EF4444',
+  saveButtonDisabled: {
+    backgroundColor: '#9CA3AF',
   },
-  dayText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  dayTextActive: {
+  saveButtonText: {
     color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  clearButton: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  clearButtonText: {
+    color: '#DC2626',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

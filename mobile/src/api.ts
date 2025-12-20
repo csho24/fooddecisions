@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { FoodItem } from './types';
+import { FoodItem, ArchivedItem } from './types';
 
 const API_URL = Constants.expoConfig?.extra?.apiBaseUrl || 'https://fooddecisions.onrender.com';
 
@@ -40,4 +40,15 @@ export async function deleteFood(id: string): Promise<void> {
     method: 'DELETE',
   });
   if (!response.ok) throw new Error('Failed to delete food');
+}
+
+export async function createArchive(data: Omit<ArchivedItem, 'id'>): Promise<ArchivedItem> {
+  const response = await fetch(`${API_URL}/api/archives`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to create archive');
+  const item = await response.json();
+  return { ...item, id: item.id.toString(), itemId: item.itemId.toString() };
 }

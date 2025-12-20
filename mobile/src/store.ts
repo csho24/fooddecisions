@@ -1,14 +1,16 @@
 import { create } from 'zustand';
-import { FoodItem, LocationDetail } from './types';
-import { getFoods, createFood, updateFood, deleteFood } from './api';
+import { FoodItem, LocationDetail, ArchivedItem } from './types';
+import { getFoods, createFood, updateFood, deleteFood, createArchive } from './api';
 
 interface StoreState {
   items: FoodItem[];
+  archivedItems: ArchivedItem[];
   isLoading: boolean;
   fetchItems: () => Promise<void>;
   addItem: (item: Omit<FoodItem, 'id'>) => Promise<void>;
   updateItem: (id: string, updates: Partial<FoodItem>) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
+  archiveItem: (id: string, status: 'eaten' | 'thrown') => Promise<void>;
   checkAvailability: (item: FoodItem, locationId?: string) => { available: boolean; reason?: string };
 }
 
@@ -22,6 +24,7 @@ function formatTime(date: Date): string {
 
 export const useFoodStore = create<StoreState>()((set, get) => ({
   items: [],
+  archivedItems: [],
   isLoading: false,
 
   fetchItems: async () => {
@@ -65,6 +68,35 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
       }));
     } catch (error) {
       console.error('Failed to remove item:', error);
+      throw error;
+    }
+  },
+
+  archiveItem: async (id, status) => {
+    try {
+      const state = get();
+      const item = state.items.find((i) => i.id === id);
+      if (!item) throw new Error('Item not found');
+
+      // Create archived item in database
+      const archivedItem = await createArchive({
+        itemId: id,
+        name: item.name,
+        category: item.category,
+        status,
+        archivedAt: new Date().toISOString(),
+      });
+
+      // Remove from active items
+      await deleteFood(id);
+
+      // Update state
+      set({
+        items: state.items.filter((i) => i.id !== id),
+        archivedItems: [...state.archivedItems, archivedItem],
+      });
+    } catch (error) {
+      console.error('Failed to archive item:', error);
       throw error;
     }
   },

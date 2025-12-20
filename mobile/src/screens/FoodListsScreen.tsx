@@ -10,20 +10,23 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFoodStore } from '../store';
-import { FoodType } from '../types';
+import { FoodType, FoodItem } from '../types';
 
 interface FoodListsScreenProps {
   navigation: any;
 }
 
 export default function FoodListsScreen({ navigation }: FoodListsScreenProps) {
-  const { items, isLoading, fetchItems, addItem, removeItem } = useFoodStore();
+  const { items, isLoading, fetchItems, addItem, removeItem, archiveItem } = useFoodStore();
   const [activeTab, setActiveTab] = useState<FoodType>('home');
   const [newItemName, setNewItemName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Fridge');
+  const [archiveModalVisible, setArchiveModalVisible] = useState(false);
+  const [itemToArchive, setItemToArchive] = useState<FoodItem | null>(null);
 
   useEffect(() => {
     fetchItems();
@@ -48,19 +51,30 @@ export default function FoodListsScreen({ navigation }: FoodListsScreenProps) {
     }
   };
 
-  const handleDeleteItem = (id: string, name: string) => {
-    Alert.alert(
-      'Delete Item',
-      `Are you sure you want to delete "${name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => removeItem(id),
-        },
-      ]
-    );
+  const handleArchive = async (status: 'eaten' | 'thrown') => {
+    if (!itemToArchive) return;
+    try {
+      if (archiveItem) {
+        await archiveItem(itemToArchive.id, status);
+      } else {
+        // Fallback to just removing if archiveItem not available
+        await removeItem(itemToArchive.id);
+      }
+      setArchiveModalVisible(false);
+      setItemToArchive(null);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to archive item');
+    }
+  };
+
+  // Calculate days remaining for expiry
+  const getDaysRemaining = (expiryDate?: string): number | null => {
+    if (!expiryDate) return null;
+    const expiry = new Date(expiryDate);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+    return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   const groupedHomeItems = activeTab === 'home'
@@ -70,13 +84,61 @@ export default function FoodListsScreen({ navigation }: FoodListsScreenProps) {
       }, {} as Record<string, typeof filteredItems>)
     : {};
 
+  const renderHomeItem = (item: FoodItem) => {
+    const daysRemaining = getDaysRemaining(item.expiryDate);
+    
+    return (
+      <View key={item.id} style={styles.itemRow}>
+        <TouchableOpacity 
+          style={styles.itemContent}
+          onPress={() => navigation.navigate('AddInfo', { itemId: item.id })}
+        >
+          <Text style={styles.itemText}>{item.name}</Text>
+          <View style={styles.itemMeta}>
+            {item.category && (
+              <Text style={styles.categoryTag}>{item.category}</Text>
+            )}
+            {daysRemaining !== null && (
+              <View style={[
+                styles.expiryBadge,
+                daysRemaining < 0 ? styles.expiredBadge :
+                daysRemaining === 0 ? styles.todayBadge :
+                daysRemaining <= 2 ? styles.soonBadge : styles.okBadge
+              ]}>
+                <Text style={[
+                  styles.expiryText,
+                  daysRemaining < 0 ? styles.expiredText :
+                  daysRemaining === 0 ? styles.todayText :
+                  daysRemaining <= 2 ? styles.soonText : styles.okText
+                ]}>
+                  {daysRemaining < 0 ? `EXP ${Math.abs(daysRemaining)}d ago` :
+                   daysRemaining === 0 ? 'EXP TODAY' :
+                   `${daysRemaining}d left`}
+                </Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.checkButton}
+          onPress={() => {
+            setItemToArchive(item);
+            setArchiveModalVisible(true);
+          }}
+        >
+          <Ionicons name="checkmark" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.title}>Food Lists</Text>
+        <Text style={styles.title}>My Food Lists</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -143,19 +205,7 @@ export default function FoodListsScreen({ navigation }: FoodListsScreenProps) {
                 return (
                   <View key={cat} style={styles.categorySection}>
                     <Text style={styles.categoryTitle}>{cat}</Text>
-                    {catItems.map(item => (
-                      <View key={item.id} style={styles.itemRow}>
-                        <Text style={styles.itemText}>{item.name}</Text>
-                        <View style={styles.itemActions}>
-                          <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={() => navigation.navigate('AddInfo', { itemId: item.id })}
-                          >
-                            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
+                    {catItems.map(item => renderHomeItem(item))}
                   </View>
                 );
               })}
@@ -163,20 +213,18 @@ export default function FoodListsScreen({ navigation }: FoodListsScreenProps) {
           ) : null
         }
         renderItem={({ item }) => (
-          <View style={styles.itemRow}>
+          <TouchableOpacity 
+            style={styles.itemRow}
+            onPress={() => navigation.navigate('AddInfo', { itemId: item.id })}
+          >
             <View style={styles.itemContent}>
               <Text style={styles.itemText}>{item.name}</Text>
               {item.locations && item.locations.length > 0 && (
                 <Text style={styles.locationCount}>{item.locations.length} locations</Text>
               )}
             </View>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('AddInfo', { itemId: item.id })}
-            >
-              <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
         )}
         ListEmptyComponent={
           activeTab === 'out' ? (
@@ -186,6 +234,46 @@ export default function FoodListsScreen({ navigation }: FoodListsScreenProps) {
           ) : null
         }
       />
+
+      {/* Archive Modal */}
+      <Modal
+        visible={archiveModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setArchiveModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Food Item Consumed?</Text>
+            <Text style={styles.modalSubtitle}>Did you eat this item or did it go to waste?</Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.thrownButton}
+                onPress={() => handleArchive('thrown')}
+              >
+                <Text style={styles.thrownButtonText}>Thrown</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.eatenButton}
+                onPress={() => handleArchive('eaten')}
+              >
+                <Text style={styles.eatenButtonText}>Eaten</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                setArchiveModalVisible(false);
+                setItemToArchive(null);
+              }}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -300,39 +388,140 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderRadius: 16,
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingVertical: 8,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   itemContent: {
     flex: 1,
+    paddingVertical: 8,
   },
   itemText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#111827',
-    flex: 1,
   },
+  itemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  categoryTag: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#6B7280',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    textTransform: 'uppercase',
+  },
+  expiryBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  expiredBadge: { backgroundColor: '#FEE2E2' },
+  todayBadge: { backgroundColor: '#FFEDD5' },
+  soonBadge: { backgroundColor: '#FEF9C3' },
+  okBadge: { backgroundColor: '#DCFCE7' },
+  expiryText: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  expiredText: { color: '#DC2626' },
+  todayText: { color: '#EA580C' },
+  soonText: { color: '#CA8A04' },
+  okText: { color: '#16A34A' },
   locationCount: {
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
   },
-  itemActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 4,
+  checkButton: {
+    width: 48,
+    height: 48,
+    backgroundColor: '#22C55E',
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#16A34A',
   },
   emptyState: {
     paddingVertical: 48,
     alignItems: 'center',
   },
   emptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  thrownButton: {
+    flex: 1,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  thrownButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  eatenButton: {
+    flex: 1,
+    backgroundColor: '#22C55E',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  eatenButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  cancelButton: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  cancelButtonText: {
     fontSize: 14,
     color: '#6B7280',
   },
