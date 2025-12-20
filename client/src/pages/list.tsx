@@ -452,12 +452,34 @@ export default function ListPage() {
                   )}>{item.name}</h3>
                   
                   {/* Home Details */}
-                  {item.type === 'home' && item.category && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                      <span className="bg-secondary/50 px-1.5 rounded text-[10px] uppercase tracking-wide font-medium">
-                        {item.category}
-                      </span>
-                      {(item.notes) && (
+                  {item.type === 'home' && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 flex-wrap">
+                      {item.category && (
+                        <span className="bg-secondary/50 px-1.5 rounded text-[10px] uppercase tracking-wide font-medium">
+                          {item.category}
+                        </span>
+                      )}
+                      {item.expiryDate && (() => {
+                        const expiry = new Date(item.expiryDate);
+                        const now = new Date();
+                        now.setHours(0, 0, 0, 0);
+                        expiry.setHours(0, 0, 0, 0);
+                        const daysRemaining = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        return (
+                          <span className={cn(
+                            "px-1.5 rounded text-[10px] font-medium",
+                            daysRemaining < 0 ? "bg-red-100 text-red-700" :
+                            daysRemaining === 0 ? "bg-orange-100 text-orange-700" :
+                            daysRemaining <= 2 ? "bg-yellow-100 text-yellow-700" :
+                            "bg-green-100 text-green-700"
+                          )}>
+                            {daysRemaining < 0 ? `EXP ${Math.abs(daysRemaining)}d ago` :
+                             daysRemaining === 0 ? "EXP TODAY" :
+                             `${daysRemaining}d left`}
+                          </span>
+                        );
+                      })()}
+                      {item.notes && (
                         <span className="truncate text-xs opacity-70 max-w-[150px]">{item.notes}</span>
                       )}
                     </div>

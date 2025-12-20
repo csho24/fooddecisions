@@ -22,6 +22,7 @@ export const foodItems = pgTable("food_items", {
   type: text("type").notNull(), // 'home' | 'out'
   category: text("category"),
   notes: text("notes"),
+  expiryDate: text("expiry_date"), // ISO date string for home items
   locations: jsonb("locations").$type<{
     id: string;
     name: string;

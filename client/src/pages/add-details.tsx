@@ -84,10 +84,14 @@ export default function AddPage() {
   const [step, setStep] = useState<'select' | 'edit'>('select');
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<'home' | 'out'>('home');
-  const [closureStep, setClosureStep] = useState<'main' | 'closure' | 'cleaning' | 'timeoff'>('main');
+  const [closureStep, setClosureStep] = useState<'main' | 'closure' | 'cleaning' | 'timeoff' | 'expiry'>('main');
   const [selectedCleaningDates, setSelectedCleaningDates] = useState<Date[]>([]);
   const [selectedTimeOffDates, setSelectedTimeOffDates] = useState<Date[]>([]);
   const [cleaningLocation, setCleaningLocation] = useState("");
+  
+  // Expiry State
+  const [selectedExpiryItem, setSelectedExpiryItem] = useState<FoodItem | null>(null);
+  const [expiryDateInput, setExpiryDateInput] = useState("");
   
   // Location Editing State
   const [editingLocation, setEditingLocation] = useState<LocationDetail | null>(null);
@@ -312,6 +316,18 @@ export default function AddPage() {
                 <span>Closure</span>
                 <span className="text-xs font-normal text-muted-foreground">Manage store schedule</span>
               </Button>
+              
+              <Button 
+                variant="outline"
+                className="h-32 text-xl rounded-3xl flex flex-col gap-3 border-2 hover:border-rose-500 hover:bg-rose-50 transition-all"
+                onClick={() => setClosureStep('expiry')}
+              >
+                <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
+                  <Clock size={24} />
+                </div>
+                <span>Expiry</span>
+                <span className="text-xs font-normal text-muted-foreground">Track home food expiry dates</span>
+              </Button>
             </div>
           ) : closureStep === 'closure' ? (
             <div className="space-y-4">
@@ -401,7 +417,7 @@ export default function AddPage() {
                 </>
               )}
             </div>
-          ) : (
+          ) : closureStep === 'timeoff' ? (
             <div className="space-y-4">
               <h3 className="font-bold text-lg">Time Off</h3>
               <Calendar
@@ -444,7 +460,205 @@ export default function AddPage() {
                 </Button>
               )}
             </div>
-          )}
+          ) : closureStep === 'expiry' ? (
+            <div className="space-y-4">
+              <h3 className="font-bold text-lg">Set Expiry Date</h3>
+              
+              {!selectedExpiryItem ? (
+                // Step 1: Select a home food item
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Select a home food item:</p>
+                  {items.filter(item => item.type === 'home').length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
+                      <p>No home items found.</p>
+                      <p className="text-sm mt-2">Add some items to your Home list first.</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[400px]">
+                      <div className="space-y-2 pr-4">
+                        {items.filter(item => item.type === 'home').map(item => {
+                          // Calculate days remaining if expiry exists
+                          let daysRemaining: number | null = null;
+                          if (item.expiryDate) {
+                            const expiry = new Date(item.expiryDate);
+                            const now = new Date();
+                            now.setHours(0, 0, 0, 0);
+                            expiry.setHours(0, 0, 0, 0);
+                            daysRemaining = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                          }
+                          
+                          return (
+                            <Button
+                              key={item.id}
+                              type="button"
+                              variant="outline"
+                              className="w-full h-auto py-4 text-left justify-between rounded-xl"
+                              onClick={() => {
+                                setSelectedExpiryItem(item);
+                                setExpiryDateInput(item.expiryDate || "");
+                              }}
+                            >
+                              <div className="flex flex-col items-start">
+                                <span className="text-lg font-medium">{item.name}</span>
+                                {item.category && (
+                                  <span className="text-xs text-muted-foreground">{item.category}</span>
+                                )}
+                              </div>
+                              {daysRemaining !== null && (
+                                <span className={cn(
+                                  "text-sm font-medium px-2 py-1 rounded-lg",
+                                  daysRemaining < 0 ? "bg-red-100 text-red-700" :
+                                  daysRemaining === 0 ? "bg-orange-100 text-orange-700" :
+                                  daysRemaining <= 2 ? "bg-yellow-100 text-yellow-700" :
+                                  "bg-green-100 text-green-700"
+                                )}>
+                                  {daysRemaining < 0 ? `${Math.abs(daysRemaining)}d ago` :
+                                   daysRemaining === 0 ? "Today!" :
+                                   `${daysRemaining}d left`}
+                                </span>
+                              )}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+              ) : (
+                // Step 2: Enter expiry date
+                <div className="space-y-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mb-2"
+                    onClick={() => {
+                      setSelectedExpiryItem(null);
+                      setExpiryDateInput("");
+                    }}
+                  >
+                    ← Back to Items
+                  </Button>
+                  
+                  <div className="bg-card border rounded-xl p-4">
+                    <h4 className="font-semibold text-lg">{selectedExpiryItem.name}</h4>
+                    {selectedExpiryItem.category && (
+                      <span className="text-sm text-muted-foreground">{selectedExpiryItem.category}</span>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Expiry Date (DD/MM/YYYY)</Label>
+                    <Input
+                      type="text"
+                      placeholder="e.g. 25/12/2024"
+                      value={expiryDateInput}
+                      onChange={(e) => {
+                        // Auto-format as user types
+                        let value = e.target.value.replace(/\D/g, '');
+                        if (value.length >= 2) {
+                          value = value.slice(0, 2) + '/' + value.slice(2);
+                        }
+                        if (value.length >= 5) {
+                          value = value.slice(0, 5) + '/' + value.slice(5, 9);
+                        }
+                        setExpiryDateInput(value);
+                      }}
+                      className="h-14 text-xl text-center rounded-xl bg-muted/30"
+                      maxLength={10}
+                    />
+                  </div>
+                  
+                  {/* Show preview of days remaining */}
+                  {expiryDateInput.length === 10 && (() => {
+                    const parts = expiryDateInput.split('/');
+                    if (parts.length === 3) {
+                      const day = parseInt(parts[0]);
+                      const month = parseInt(parts[1]) - 1;
+                      const year = parseInt(parts[2]);
+                      const expiry = new Date(year, month, day);
+                      const now = new Date();
+                      now.setHours(0, 0, 0, 0);
+                      expiry.setHours(0, 0, 0, 0);
+                      
+                      if (!isNaN(expiry.getTime())) {
+                        const daysRemaining = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        return (
+                          <div className={cn(
+                            "text-center py-4 rounded-xl font-medium text-lg",
+                            daysRemaining < 0 ? "bg-red-100 text-red-700" :
+                            daysRemaining === 0 ? "bg-orange-100 text-orange-700" :
+                            daysRemaining <= 2 ? "bg-yellow-100 text-yellow-700" :
+                            "bg-green-100 text-green-700"
+                          )}>
+                            {daysRemaining < 0 ? `Expired ${Math.abs(daysRemaining)} days ago` :
+                             daysRemaining === 0 ? "Expires today!" :
+                             daysRemaining === 1 ? "Expires tomorrow!" :
+                             `${daysRemaining} days remaining`}
+                          </div>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+                  
+                  <Button
+                    type="button"
+                    className="w-full h-14 text-lg rounded-xl"
+                    disabled={expiryDateInput.length !== 10}
+                    onClick={async () => {
+                      // Parse DD/MM/YYYY to ISO date
+                      const parts = expiryDateInput.split('/');
+                      if (parts.length === 3) {
+                        const day = parseInt(parts[0]);
+                        const month = parseInt(parts[1]) - 1;
+                        const year = parseInt(parts[2]);
+                        const isoDate = new Date(year, month, day).toISOString().split('T')[0];
+                        
+                        try {
+                          await updateItem(selectedExpiryItem.id, { expiryDate: isoDate });
+                          toast({ 
+                            title: "Expiry Set!", 
+                            description: `${selectedExpiryItem.name} expires on ${expiryDateInput}` 
+                          });
+                          setSelectedExpiryItem(null);
+                          setExpiryDateInput("");
+                        } catch (error) {
+                          console.error('Error saving expiry date:', error);
+                          toast({ 
+                            title: "Error", 
+                            description: "Failed to save expiry date.",
+                            variant: "destructive"
+                          });
+                        }
+                      }
+                    }}
+                  >
+                    Save Expiry Date
+                  </Button>
+                  
+                  {selectedExpiryItem.expiryDate && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full text-destructive hover:text-destructive"
+                      onClick={async () => {
+                        try {
+                          await updateItem(selectedExpiryItem.id, { expiryDate: undefined });
+                          toast({ title: "Cleared", description: "Expiry date removed." });
+                          setSelectedExpiryItem(null);
+                          setExpiryDateInput("");
+                        } catch (error) {
+                          console.error('Error clearing expiry date:', error);
+                        }
+                      }}
+                    >
+                      Clear Expiry Date
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </Layout>
     );

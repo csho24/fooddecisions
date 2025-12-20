@@ -25,6 +25,7 @@ export interface FoodItem {
   // For 'home' items
   category?: string; 
   notes?: string;
+  expiryDate?: string; // ISO date string
   
   // For 'out' items - New Structure
   locations?: LocationDetail[];
