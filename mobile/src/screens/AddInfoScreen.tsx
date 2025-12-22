@@ -140,78 +140,24 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
     }
   };
 
-  // Main screen with Closure and Expiry cards
-  if (mainStep === 'main') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="#111827" />
-          </TouchableOpacity>
-          <Text style={styles.title}>{getTitle()}</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <View style={styles.cardsContainer}>
-          <TouchableOpacity
-            style={styles.mainCard}
-            onPress={() => setMainStep('closure')}
-          >
-            <View style={[styles.cardIcon, { backgroundColor: '#F3E8FF' }]}>
-              <Ionicons name="calendar" size={28} color="#9333EA" />
-            </View>
-            <Text style={styles.cardTitle}>Closure</Text>
-            <Text style={styles.cardSubtitle}>When is your fave stall closed?</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.mainCard}
-            onPress={() => setMainStep('expiry')}
-          >
-            <View style={[styles.cardIcon, { backgroundColor: '#FFE4E6' }]}>
-              <Ionicons name="time" size={28} color="#E11D48" />
-            </View>
-            <Text style={styles.cardTitle}>Expiry</Text>
-            <Text style={styles.cardSubtitle}>Be reminded before food expires!</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Closure screen (placeholder - can be expanded)
-  if (mainStep === 'closure') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="#111827" />
-          </TouchableOpacity>
-          <Text style={styles.title}>{getTitle()}</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <View style={styles.cardsContainer}>
-          <TouchableOpacity style={styles.mainCard}>
-            <View style={[styles.cardIcon, { backgroundColor: '#DBEAFE' }]}>
-              <Ionicons name="sparkles" size={28} color="#2563EB" />
-            </View>
-            <Text style={styles.cardTitle}>Cleaning</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.mainCard}>
-            <View style={[styles.cardIcon, { backgroundColor: '#FEF3C7' }]}>
-              <Ionicons name="calendar" size={28} color="#D97706" />
-            </View>
-            <Text style={styles.cardTitle}>Time Off</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Item Details view (when clicking an Out item from Food List)
-  if (mainStep === 'itemDetails' && selectedItem) {
+  // Item Details view (when clicking an Out item from Food List) - CHECK FIRST
+  if (itemId) {
+    // If we have an itemId, show item details (not Closure/Expiry)
+    if (!selectedItem) {
+      // Still loading
+      return (
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color="#111827" />
+            </TouchableOpacity>
+            <Text style={styles.title}>Loading...</Text>
+            <View style={{ width: 24 }} />
+          </View>
+        </SafeAreaView>
+      );
+    }
+    
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
@@ -360,6 +306,76 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
             </View>
           </View>
         </Modal>
+      </SafeAreaView>
+    );
+  }
+
+  // Main screen with Closure and Expiry cards (NO itemId)
+  if (mainStep === 'main') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.title}>{getTitle()}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <View style={styles.cardsContainer}>
+          <TouchableOpacity
+            style={styles.mainCard}
+            onPress={() => setMainStep('closure')}
+          >
+            <View style={[styles.cardIcon, { backgroundColor: '#F3E8FF' }]}>
+              <Ionicons name="calendar" size={28} color="#9333EA" />
+            </View>
+            <Text style={styles.cardTitle}>Closure</Text>
+            <Text style={styles.cardSubtitle}>When is your fave stall closed?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.mainCard}
+            onPress={() => setMainStep('expiry')}
+          >
+            <View style={[styles.cardIcon, { backgroundColor: '#FFE4E6' }]}>
+              <Ionicons name="time" size={28} color="#E11D48" />
+            </View>
+            <Text style={styles.cardTitle}>Expiry</Text>
+            <Text style={styles.cardSubtitle}>Be reminded before food expires!</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Closure screen (placeholder - can be expanded)
+  if (mainStep === 'closure') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.title}>{getTitle()}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <View style={styles.cardsContainer}>
+          <TouchableOpacity style={styles.mainCard}>
+            <View style={[styles.cardIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Ionicons name="sparkles" size={28} color="#2563EB" />
+            </View>
+            <Text style={styles.cardTitle}>Cleaning</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.mainCard}>
+            <View style={[styles.cardIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="calendar" size={28} color="#D97706" />
+            </View>
+            <Text style={styles.cardTitle}>Time Off</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
