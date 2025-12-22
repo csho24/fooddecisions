@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn, capitalizeWords } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSavedLocations } from "@/hooks/use-saved-locations";
 import { Search, ChevronDown, Home, Utensils, Clock, Plus, MapPin, X, Trash2, Calendar as CalendarIcon, Sparkles } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
@@ -108,18 +108,27 @@ export default function AddPage() {
   // Delete Confirmation State
   const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
 
-  // Handle deep linking via ID
+  // Handle deep linking via ID - only set selectedItem when ID changes, not on every items update
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     const id = params.get('id');
     if (id) {
       const found = items.find(i => i.id === id);
-      if (found) {
+      // Only update selectedItem if:
+      // 1. We don't have a selectedItem yet, OR
+      // 2. The ID in the URL changed (navigating to a different item)
+      if (found && (!selectedItem || selectedItem.id !== id)) {
         setSelectedItem(found);
         setStep('edit');
       }
+    } else {
+      // No ID in URL, clear selection if we had one
+      if (selectedItem) {
+        setSelectedItem(null);
+        setStep('select');
+      }
     }
-  }, [searchString, items]);
+  }, [searchString, items, selectedItem]);
 
   // Filter items for selection
   const filteredItems = items.filter(item => 
@@ -150,38 +159,51 @@ export default function AddPage() {
 
   const watchType = form.watch("type");
 
-  // Populate form when item selected
+  // Populate form when item selected - only reset when ID changes to prevent overwriting user edits
+  const lastSelectedIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedItem) {
+    if (selectedItem && selectedItem.id !== lastSelectedIdRef.current) {
+      lastSelectedIdRef.current = selectedItem.id;
       form.reset({
         id: selectedItem.id,
         name: selectedItem.name,
         type: selectedItem.type,
         category: selectedItem.category || "",
       });
+    } else if (!selectedItem) {
+      lastSelectedIdRef.current = null;
     }
   }, [selectedItem, form]);
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     // Ensure capitalization even if onBlur didn't fire
     const capitalizedName = capitalizeWords(values.name.trim());
-    if (selectedItem) {
-      updateItem(selectedItem.id, {
-        name: capitalizedName,
-        category: values.type === 'home' ? values.category : undefined,
-      });
-      toast({ title: "Updated!", description: "Item details saved." });
-    } else {
+    try {
+      if (selectedItem) {
+        await updateItem(selectedItem.id, {
+          name: capitalizedName,
+          category: values.type === 'home' ? values.category : undefined,
+        });
+        toast({ title: "Updated!", description: "Item details saved." });
+      } else {
         // Creating new item from scratch via this page (unlikely given flow, but possible)
-        addItem({
+        await addItem({
             name: capitalizedName,
             type: values.type as FoodType,
             category: values.category,
             locations: [],
         });
         toast({ title: "Created!", description: "New item added." });
+      }
+      setLocation("/list");
+    } catch (error) {
+      console.error("Failed to save item:", error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to save changes. Please try again.",
+        variant: "destructive"
+      });
     }
-    setLocation("/list");
   }
 
   function handleAddLocation() {
