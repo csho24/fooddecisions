@@ -32,7 +32,9 @@ export default function FoodListsScreen({ navigation }: FoodListsScreenProps) {
     fetchItems();
   }, []);
 
-  const filteredItems = items.filter(item => item.type === activeTab);
+  const filteredItems = items
+    .filter(item => item.type === activeTab)
+    .sort((a, b) => a.name.localeCompare(b.name));
   const homeCategories = ['Fridge', 'Snacks'];
 
   const handleAddItem = async () => {

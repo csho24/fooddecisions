@@ -17,3 +17,4 @@ CREATE INDEX IF NOT EXISTS idx_closure_schedules_type ON closure_schedules(type)
 
 
 
+

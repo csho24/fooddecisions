@@ -12,7 +12,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Food{'\n'}Decisions</Text>
-          <Ionicons name="sparkles" size={20} color="#6366F1" style={styles.sparkle} />
+          <Ionicons name="sparkles" size={20} color="#F97316" style={styles.sparkle} />
         </View>
         <Text style={styles.subtitle}>what and where shall we eat today?</Text>
       </View>
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 40,
     fontWeight: '800',
-    color: '#6366F1',
+    color: '#F97316',
     lineHeight: 44,
     letterSpacing: -1,
   },
@@ -119,11 +119,11 @@ const styles = StyleSheet.create({
   // DECIDE card - Big and prominent
   decideCard: {
     height: 180,
-    backgroundColor: '#6366F1',
+    backgroundColor: '#F97316',
     borderRadius: 28,
     padding: 24,
     overflow: 'hidden',
-    shadowColor: '#6366F1',
+    shadowColor: '#F97316',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,

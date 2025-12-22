@@ -31,24 +31,41 @@ const DAYS = [
   { id: 0, label: 'S' },
 ];
 
-type MainStep = 'main' | 'closure' | 'expiry';
+type MainStep = 'main' | 'closure' | 'expiry' | 'itemDetails';
 type ExpiryStep = 'category' | 'items' | 'date';
 
 export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps) {
   const { items, fetchItems, updateItem } = useFoodStore();
   
+  // Check if we're viewing a specific item
+  const itemId = route.params?.itemId;
+  const selectedItem = items.find(item => item.id === itemId);
+  
   // Main navigation state
-  const [mainStep, setMainStep] = useState<MainStep>('main');
+  const [mainStep, setMainStep] = useState<MainStep>(itemId ? 'itemDetails' : 'main');
   
   // Expiry state
   const [expiryStep, setExpiryStep] = useState<ExpiryStep>('category');
   const [selectedExpiryCategory, setSelectedExpiryCategory] = useState<'Fridge' | 'Snacks' | null>(null);
   const [selectedExpiryItem, setSelectedExpiryItem] = useState<FoodItem | null>(null);
   const [expiryDateInput, setExpiryDateInput] = useState('');
+  
+  // Location editing state
+  const [editingLocation, setEditingLocation] = useState<LocationDetail | null>(null);
+  const [locationName, setLocationName] = useState('');
+  const [locationNotes, setLocationNotes] = useState('');
+  const [showLocationModal, setShowLocationModal] = useState(false);
 
   useEffect(() => {
     fetchItems();
   }, []);
+  
+  // Reset to itemDetails view when itemId changes
+  useEffect(() => {
+    if (itemId) {
+      setMainStep('itemDetails');
+    }
+  }, [itemId]);
 
   // Get title based on current step
   const getTitle = () => {
@@ -189,6 +206,160 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
             <Text style={styles.cardTitle}>Time Off</Text>
           </TouchableOpacity>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Item Details view (when clicking an Out item from Food List)
+  if (mainStep === 'itemDetails' && selectedItem) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Edit Info</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView style={styles.detailsContainer}>
+          {/* Item Name */}
+          <View style={styles.itemNameCard}>
+            <Text style={styles.itemNameLabel}>Food Item</Text>
+            <Text style={styles.itemNameText}>{selectedItem.name}</Text>
+          </View>
+
+          {/* Locations Section */}
+          <View style={styles.locationsSection}>
+            <View style={styles.locationsSectionHeader}>
+              <Text style={styles.sectionTitle}>Locations</Text>
+              <TouchableOpacity
+                style={styles.addLocationButton}
+                onPress={() => {
+                  setEditingLocation(null);
+                  setLocationName('');
+                  setLocationNotes('');
+                  setShowLocationModal(true);
+                }}
+              >
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+                <Text style={styles.addLocationButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+
+            {selectedItem.locations && selectedItem.locations.length > 0 ? (
+              selectedItem.locations.map((loc) => (
+                <TouchableOpacity
+                  key={loc.id}
+                  style={styles.locationCard}
+                  onPress={() => {
+                    setEditingLocation(loc);
+                    setLocationName(loc.name);
+                    setLocationNotes(loc.notes || '');
+                    setShowLocationModal(true);
+                  }}
+                >
+                  <View style={styles.locationCardContent}>
+                    <Ionicons name="location" size={20} color="#6B7280" />
+                    <Text style={styles.locationName}>{loc.name}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.noLocationsBox}>
+                <Text style={styles.noLocationsText}>No locations added yet.</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Location Modal */}
+        <Modal
+          visible={showLocationModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowLocationModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {editingLocation ? 'Edit Location' : 'Add Location'}
+                </Text>
+                <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                <Text style={styles.inputLabel}>Location Name</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={locationName}
+                  onChangeText={setLocationName}
+                  placeholder="e.g. Maxwell, Bedok"
+                />
+
+                <Text style={[styles.inputLabel, { marginTop: 16 }]}>Notes (optional)</Text>
+                <TextInput
+                  style={[styles.modalInput, styles.notesInput]}
+                  value={locationNotes}
+                  onChangeText={setLocationNotes}
+                  placeholder="Any notes about this location"
+                  multiline
+                />
+              </View>
+
+              <View style={styles.modalFooter}>
+                {editingLocation && (
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={async () => {
+                      if (!selectedItem) return;
+                      const updatedLocations = (selectedItem.locations || []).filter(
+                        l => l.id !== editingLocation.id
+                      );
+                      await updateItem(selectedItem.id, { locations: updatedLocations });
+                      setShowLocationModal(false);
+                      Alert.alert('Deleted', 'Location removed.');
+                    }}
+                  >
+                    <Ionicons name="trash" size={20} color="#DC2626" />
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={[styles.saveLocationButton, !locationName.trim() && styles.saveButtonDisabled]}
+                  onPress={async () => {
+                    if (!locationName.trim() || !selectedItem) return;
+                    
+                    const newLocation: LocationDetail = {
+                      id: editingLocation?.id || Math.random().toString(36).substr(2, 9),
+                      name: locationName.trim(),
+                      notes: locationNotes.trim() || undefined,
+                    };
+
+                    let updatedLocations = selectedItem.locations || [];
+                    if (editingLocation) {
+                      updatedLocations = updatedLocations.map(l => 
+                        l.id === editingLocation.id ? newLocation : l
+                      );
+                    } else {
+                      updatedLocations = [...updatedLocations, newLocation];
+                    }
+
+                    await updateItem(selectedItem.id, { locations: updatedLocations });
+                    setShowLocationModal(false);
+                    Alert.alert('Saved', `Location ${editingLocation ? 'updated' : 'added'}.`);
+                  }}
+                  disabled={!locationName.trim()}
+                >
+                  <Text style={styles.saveLocationButtonText}>Save Location</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -555,5 +726,164 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 16,
     fontWeight: '500',
+  },
+  // Item Details styles
+  detailsContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  itemNameCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  itemNameLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  itemNameText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  locationsSection: {
+    marginBottom: 24,
+  },
+  locationsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  addLocationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  addLocationButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  locationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  locationCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  locationName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  noLocationsBox: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#D1D5DB',
+  },
+  noLocationsText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalBody: {
+    padding: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  notesInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  deleteButton: {
+    width: 56,
+    height: 56,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveLocationButton: {
+    flex: 1,
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  saveLocationButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
