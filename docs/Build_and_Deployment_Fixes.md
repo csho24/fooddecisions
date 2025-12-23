@@ -1,8 +1,8 @@
-# Build Problems and Fixes - December 5, 2024
+# Build & Deployment Fixes
 
-This document logs the build issues encountered when deploying to Render and their solutions.
+This document logs build and deployment issues encountered when deploying to Render (and related CI/CD problems).
 
-**Date:** December 5, 2024 (Dec 5)
+**Focus:** Build failures, deployment configuration, CI/CD pipeline issues
 
 ## Overview
 
