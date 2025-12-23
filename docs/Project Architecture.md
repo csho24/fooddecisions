@@ -2,7 +2,7 @@
 
 This document explains how the Food Compass website works, covering architectural decisions, design patterns, and key implementation strategies.
 
-**Last Updated:** December 19, 2024
+**Last Updated:** December 23, 2024
 
 ---
 
@@ -132,7 +132,7 @@ const HOME_CATEGORIES = [
 - Stored in `item.category` field
 - Represents storage location in the home
 
-#### B. "Out" Food Categories (Automatic)
+#### B. "Out" Food Categories (Manual Override + Auto-Fallback)
 ```typescript
 // From food-categories.ts
 export type FoodCategory = 
@@ -147,25 +147,48 @@ export function categorizeFood(foodName: string): FoodCategory {
   // Rule-based categorization with keywords...
 }
 ```
-- Auto-categorized based on food name
+- **Saved category takes priority** - if user manually sets category, use it
+- Auto-categorizes based on food name as fallback
 - Used in Decide page to help filter restaurant options
 - Categories represent cuisine/dish types
+
+### CRITICAL: Category Flow Across Pages
+
+**Categories must be consistent across all pages:**
+
+| Page | How Categories Work |
+|------|---------------------|
+| `add-details.tsx` | User can manually change category via dialog. Saves to `item.category` in database. |
+| `decide.tsx` | Must check `item.category` first. Only use `categorizeFood()` as fallback if no saved category. |
+| `list.tsx` | Displays saved category badge if exists. |
+
+**Implementation Pattern (Dec 23, 2024 fix):**
+```typescript
+// CORRECT - Check saved category first, then fallback to auto
+const foodCategory = item.category && ['Noodles', 'Rice', 'Ethnic', 'Light', 'Western'].includes(item.category)
+  ? item.category as FoodCategory
+  : categorizeFood(item.name);
+
+// WRONG - Always auto-categorizing ignores user's manual override
+const foodCategory = categorizeFood(item.name);  // ❌ Don't do this!
+```
 
 ### Why Two Systems?
 
 **Home vs Out are fundamentally different:**
 - **Home** = storage location (fridge, pantry, snacks) - user knows best
-- **Out** = food type (noodles, rice, western) - can be inferred from name
+- **Out** = food type (noodles, rice, western) - can be inferred from name, but user can override
 
 **Decision rationale:**
 1. Can't intelligently guess if something belongs in Fridge vs Snacks
 2. CAN intelligently guess "laksa" → Noodles or "burger" → Western
-3. Manual categories are simple with few options (2 categories)
-4. Auto categories provide convenience without requiring user input
+3. But user should be able to override if auto-categorization is wrong
+4. Manual categories are simple with few options (2 categories for Home)
+5. Auto categories provide convenience without requiring user input
 
 ### Auto-Categorization Strategy
 
-**Rule-based keyword matching:**
+**Rule-based keyword matching (fallback only):**
 ```typescript
 if (lower.includes('noodle') || lower.includes('mee') || lower.includes('laksa'))
   return "Noodles";
@@ -176,6 +199,7 @@ if (lower.includes('noodle') || lower.includes('mee') || lower.includes('laksa')
 - Works well for common food names
 - Easy to expand with more keywords
 - Provides immediate value without ML complexity
+- User can override if wrong
 
 **Principle:** Keep category lists small (5 categories) for faster decision-making.
 

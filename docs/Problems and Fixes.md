@@ -1,6 +1,99 @@
-# December 19, 2024 - Fixes & Solutions
+# Problems and Fixes Log
 
-This document tracks specific problems encountered and solved on December 19, 2024.
+This document tracks specific problems encountered and their solutions.
+
+---
+
+# December 23, 2024 - Category System Fix
+
+**Date:** December 23, 2024  
+**Status:** ✅ All issues resolved
+
+---
+
+## Issue: Category Changes Not Reflecting in Decide Page
+
+### Problem
+User changed an "Out" item's category from "Ethnic" to "Light" in the edit page. The dropdown and tag showed "Light" correctly, but when navigating to Decide > Out > Food > Light, the item didn't appear there.
+
+### Root Cause (Multiple Issues)
+
+**1. `handleSelectCategory()` never saved to database**
+```typescript
+// BUG: Just showed toast, never saved!
+function handleSelectCategory(categoryName: string) {
+  toast({ title: "Category Updated" });  // Lies!
+  setIsChangeCategoryDialogOpen(false);
+  // Missing: updateItem() call
+}
+```
+
+**2. `decide.tsx` ignored saved category**
+```typescript
+// BUG: Always auto-categorized, ignored user's manual selection
+foodCategory: categorizeFood(item.name)  // ❌ Ignored item.category!
+```
+
+**3. Form reset race condition**
+The `useEffect` watching `items` would reset the form whenever the items array changed, overwriting user's category selection before they could save.
+
+### Solution
+
+**Fix 1: Actually save category to database (`add-details.tsx`)**
+```typescript
+async function handleSelectCategory(categoryName: string) {
+  if (!selectedItem) return;
+  try {
+    await updateItem(selectedItem.id, { category: categoryName });
+    setSelectedItem({ ...selectedItem, category: categoryName });
+    toast({ title: "Category Updated", description: `Set to ${categoryName}` });
+  } catch (error) {
+    toast({ title: "Error", variant: "destructive" });
+  }
+  setIsChangeCategoryDialogOpen(false);
+}
+```
+
+**Fix 2: Use saved category in Decide page (`decide.tsx`)**
+```typescript
+foodCategory: (item.category && ['Noodles', 'Rice', 'Ethnic', 'Light', 'Western'].includes(item.category)) 
+  ? (item.category as FoodCategory) 
+  : categorizeFood(item.name)
+```
+
+**Fix 3: Prevent form reset race condition (`add-details.tsx`)**
+```typescript
+// Only update selectedItem when ID changes, not on every items update
+const lastSelectedIdRef = useRef<string | null>(null);
+useEffect(() => {
+  if (selectedItem && selectedItem.id !== lastSelectedIdRef.current) {
+    lastSelectedIdRef.current = selectedItem.id;
+    form.reset({ ... });
+  }
+}, [selectedItem, form]);
+```
+
+### Files Changed
+- `client/src/pages/add-details.tsx` - Fixed category saving and form reset
+- `client/src/pages/decide.tsx` - Fixed category filtering
+- `docs/Project Architecture.md` - Documented category flow
+
+### Verification
+- ✅ Category selection saves to database
+- ✅ Changed category shows in Decide page filter
+- ✅ Form doesn't reset while editing
+- ✅ Category persists after page refresh
+
+### Lesson Learned
+**Categories are connected across pages.** When implementing category changes:
+1. Save to database immediately
+2. Update local state for instant feedback
+3. All pages displaying categories must check saved category first
+4. Document the category flow in architecture docs
+
+---
+
+# December 19, 2024 - Fixes & Solutions
 
 **Date:** December 19, 2024  
 **Status:** ✅ All issues resolved
