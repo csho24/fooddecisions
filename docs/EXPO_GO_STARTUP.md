@@ -57,17 +57,6 @@ Delete it immediately. See the comment at the top of `app.config.js` for why.
 - `npm run start:clean` - Start with cleared Metro cache
 - `npm run start:fresh` - **BEST** - Clear all caches and start fresh
 
-## If Phone Shows Old Code / "No apps connected"
-
-This means phone can't reach your computer (network issue, not caching).
-
-**Use tunnel mode:**
-```bash
-npx expo start --tunnel --clear
-```
-
-This bypasses local network and connects through the internet.
-
 ## Why This Matters
 
 Expo Go loads directly from your dev server. It doesn't need or want OTA updates. Having update configs causes it to try checking for remote updates, which fails and breaks the app.

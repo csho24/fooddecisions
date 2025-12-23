@@ -126,7 +126,7 @@ export default function AddPage() {
       if (selectedItem) {
         setSelectedItem(null);
         setStep('select');
-      }
+    }
     }
   }, [searchString, items, selectedItem]);
 
@@ -179,13 +179,13 @@ export default function AddPage() {
     // Ensure capitalization even if onBlur didn't fire
     const capitalizedName = capitalizeWords(values.name.trim());
     try {
-      if (selectedItem) {
+    if (selectedItem) {
         await updateItem(selectedItem.id, {
-          name: capitalizedName,
-          category: values.type === 'home' ? values.category : undefined,
-        });
-        toast({ title: "Updated!", description: "Item details saved." });
-      } else {
+        name: capitalizedName,
+        category: values.type === 'home' ? values.category : undefined,
+      });
+      toast({ title: "Updated!", description: "Item details saved." });
+    } else {
         // Creating new item from scratch via this page (unlikely given flow, but possible)
         await addItem({
             name: capitalizedName,
@@ -194,8 +194,8 @@ export default function AddPage() {
             locations: [],
         });
         toast({ title: "Created!", description: "New item added." });
-      }
-      setLocation("/list");
+    }
+    setLocation("/list");
     } catch (error) {
       console.error("Failed to save item:", error);
       toast({ 
@@ -289,18 +289,32 @@ export default function AddPage() {
   // Category Management Functions
   function getCurrentCategory(): string {
     if (!selectedItem) return "Ethnic";
-    // For now, just use the auto-categorization
+    // Use saved category if exists, otherwise auto-categorize
+    if (selectedItem.category) {
+      return selectedItem.category;
+    }
     return categorizeFood(selectedItem.name);
   }
 
-  function handleSelectCategory(categoryName: string) {
+  async function handleSelectCategory(categoryName: string) {
     if (!selectedItem) return;
-    // TODO: When we add database support, save the manual category override
-    toast({ title: "Category Updated", description: `Set to ${categoryName}` });
+    try {
+      await updateItem(selectedItem.id, { category: categoryName });
+      // Update local state to reflect change immediately
+      setSelectedItem({ ...selectedItem, category: categoryName });
+      toast({ title: "Category Updated", description: `Set to ${categoryName}` });
+    } catch (error) {
+      console.error("Failed to update category:", error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to update category.",
+        variant: "destructive"
+      });
+    }
     setIsChangeCategoryDialogOpen(false);
   }
 
-  function handleAddNewCategory() {
+  async function handleAddNewCategory() {
     const trimmedName = newCategoryName.trim();
     if (!trimmedName) return;
     
@@ -311,7 +325,7 @@ export default function AddPage() {
     
     // If there's a selected item, assign this new category to it
     if (selectedItem) {
-      handleSelectCategory(trimmedName);
+      await handleSelectCategory(trimmedName);
     }
     
     setNewCategoryName("");

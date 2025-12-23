@@ -366,3 +366,91 @@ This ensures:
 
 **Status:** ✅ Reliability improvements implemented - use `npm run start:fresh` for most reliable startup
 
+---
+
+## Update: December 22, 2024 - Phone Not Connected / Changes Not Loading
+
+**Date:** December 22, 2024  
+**Issue:** Code changes not appearing on phone despite restarting Expo server  
+**Status:** ✅ Resolved with tunnel mode
+
+### Problem Identified
+
+After making code changes to mobile app, changes were NOT showing on the phone. Even after:
+1. Clearing `.expo` and `node_modules/.cache` folders
+2. Running `npm run start:fresh`
+3. Clearing Expo Go cache on phone
+4. Restarting Expo server multiple times
+5. Rescanning QR code
+6. Reinstalling node_modules
+
+The app kept showing OLD cached code (e.g., purple colors instead of updated orange).
+
+### Root Cause
+
+The key clue was when pressing `r` in terminal to reload, it showed:
+```
+No apps connected. Sending "reload" to all React Native apps failed.
+Make sure your app is running in the simulator or on a phone connected via USB.
+```
+
+**This meant the phone was NOT connected to the Metro bundler server at all.** The phone was displaying old cached JavaScript bundle from a previous session, not loading from the dev server.
+
+The phone and computer were on networks that couldn't communicate (different subnets, firewall, or network isolation).
+
+### What DIDN'T Work (6 attempts)
+
+1. ❌ `npm run start:fresh` - Cache cleared but phone still not connected
+2. ❌ Clearing Expo Go cache on phone - Old bundle still showing
+3. ❌ Reinstalling node_modules - Didn't fix network issue
+4. ❌ `npx expo start --clear` - Same network problem
+5. ❌ `npx expo start --lan --clear` - Phone couldn't reach LAN IP
+6. ❌ Rescanning QR code multiple times - Same old cached content
+
+### What FIXED It
+
+**Tunnel mode:**
+```bash
+cd mobile && npx expo start --tunnel --clear
+```
+
+Tunnel mode uses ngrok to create an internet tunnel, bypassing local network issues entirely. The phone connects through the internet instead of trying to reach the local IP.
+
+**Note:** If ngrok fails to install globally, you may need to:
+```bash
+npm install -g @expo/ngrok@^4.1.0
+```
+Or run with sudo if permission issues.
+
+### How to Identify This Problem
+
+**Symptom:** Changes not appearing on phone despite all cache clearing
+
+**Test:** Press `r` in terminal after scanning QR. If you see "No apps connected" → phone is NOT connected to server.
+
+**Verify connection:** When properly connected, pressing `r` should trigger a reload on the phone immediately.
+
+### Prevention
+
+If you're on a network where LAN mode doesn't work (corporate networks, VPNs, different subnets):
+- Always use `npx expo start --tunnel`
+- Or ensure phone and computer are on exact same WiFi network with no isolation
+
+### Updated Startup Commands
+
+```bash
+# Standard (when on same network)
+npm run start:fresh
+
+# If phone not connecting (network issues)
+npx expo start --tunnel --clear
+```
+
+### Key Lesson
+
+**"No apps connected" = Network problem, not caching problem.**
+
+All the cache clearing in the world won't help if the phone can't reach the server. Check connection first by pressing `r` in terminal.
+
+**Status:** ✅ Resolved - Use tunnel mode when LAN mode doesn't work
+
