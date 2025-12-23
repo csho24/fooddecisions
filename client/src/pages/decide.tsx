@@ -95,7 +95,7 @@ export default function Decide() {
     return Array.from(locationMap.values()).sort();
   }, [items, selectedType]);
 
-  // Get items grouped by food category
+  // Get items grouped by food category - use saved category if exists, otherwise auto-categorize
   const itemsByFoodCategory: Record<FoodCategory, Array<FoodItem & { status: ReturnType<typeof checkAvailability>; foodCategory: FoodCategory }>> = useMemo(() => {
     if (selectedType !== 'out') return {} as Record<FoodCategory, Array<FoodItem & { status: ReturnType<typeof checkAvailability>; foodCategory: FoodCategory }>>;
     const outItems = items
@@ -103,7 +103,10 @@ export default function Decide() {
       .map(item => ({
         ...item,
         status: checkAvailability(item),
-        foodCategory: categorizeFood(item.name)
+        // Use saved category if it exists and is a valid FoodCategory, otherwise auto-categorize
+        foodCategory: (item.category && ['Noodles', 'Rice', 'Ethnic', 'Light', 'Western'].includes(item.category)) 
+          ? (item.category as FoodCategory) 
+          : categorizeFood(item.name)
       }));
     
     return outItems.reduce((acc, item) => {
