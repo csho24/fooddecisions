@@ -121,7 +121,10 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
       );
     }
 
-    const currentCategory = categorizeFood(selectedItem.name);
+    // Use saved category if exists, otherwise auto-categorize
+    const currentCategory = (selectedItem.category && FOOD_CATEGORIES.includes(selectedItem.category))
+      ? selectedItem.category
+      : categorizeFood(selectedItem.name);
 
     return (
       <SafeAreaView style={styles.container}>
@@ -386,10 +389,15 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
                       styles.categoryOption,
                       currentCategory === cat && styles.categoryOptionSelected
                     ]}
-                    onPress={() => {
-                      // Categories are auto-generated from name, so just close
-                      setShowCategoryModal(false);
-                      Alert.alert('Info', 'Categories are auto-generated based on food name.');
+                    onPress={async () => {
+                      try {
+                        await updateItem(selectedItem.id, { category: cat });
+                        setShowCategoryModal(false);
+                        Alert.alert('Category Updated', `Set to ${cat}`);
+                      } catch (error) {
+                        console.error('Failed to update category:', error);
+                        Alert.alert('Error', 'Failed to update category');
+                      }
                     }}
                   >
                     <Text style={[
