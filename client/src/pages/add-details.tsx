@@ -195,7 +195,10 @@ export default function AddPage() {
         });
         toast({ title: "Created!", description: "New item added." });
     }
-    setLocation("/list");
+    // Restore filter from sessionStorage when navigating back
+    const savedFilter = sessionStorage.getItem('food-list-filter');
+    const filterParam = savedFilter && (savedFilter === 'home' || savedFilter === 'out') ? `?filter=${savedFilter}` : '';
+    setLocation(`/list${filterParam}`);
     } catch (error) {
       console.error("Failed to save item:", error);
       toast({ 
@@ -873,9 +876,12 @@ export default function AddPage() {
                className="w-full h-12 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
                onClick={() => {
                  if (selectedItem.id) {
-                   removeItem(selectedItem.id);
-                   toast({ title: "Deleted", description: `${selectedItem.name} removed.` });
-                   setLocation("/list");
+                  removeItem(selectedItem.id);
+                  toast({ title: "Deleted", description: `${selectedItem.name} removed.` });
+                  // Restore filter from sessionStorage when navigating back
+                  const savedFilter = sessionStorage.getItem('food-list-filter');
+                  const filterParam = savedFilter && (savedFilter === 'home' || savedFilter === 'out') ? `?filter=${savedFilter}` : '';
+                  setLocation(`/list${filterParam}`);
                  }
                }}
              >

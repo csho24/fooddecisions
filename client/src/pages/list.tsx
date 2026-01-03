@@ -51,9 +51,18 @@ const quickAddSchema = z.object({
 export default function ListPage() {
   const { items, archivedItems, removeItem, checkAvailability, addItem, archiveItem, deleteArchivedItem } = useFoodStore();
   const { saveLocation, getFilteredLocations } = useSavedLocations();
-  const [filter, setFilter] = useState<'home' | 'out'>('home');
+  const [location, setLocation] = useLocation();
+  const [filter, setFilter] = useState<'home' | 'out'>(() => {
+    // Check URL params first, then sessionStorage
+    const params = new URLSearchParams(location.split('?')[1]);
+    const urlFilter = params.get('filter');
+    if (urlFilter === 'home' || urlFilter === 'out') {
+      return urlFilter;
+    }
+    const saved = sessionStorage.getItem('food-list-filter');
+    return (saved === 'home' || saved === 'out') ? saved : 'home';
+  });
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [_, setLocation] = useLocation();
   const [itemToArchive, setItemToArchive] = useState<string | null>(null);
   const [showEatenStats, setShowEatenStats] = useState(false);
   const [locationQuery, setLocationQuery] = useState("");
@@ -403,7 +412,10 @@ export default function ListPage() {
         <Button 
           variant={filter === 'home' ? 'default' : 'ghost'} 
           size="sm" 
-          onClick={() => setFilter('home')}
+          onClick={() => {
+            setFilter('home');
+            sessionStorage.setItem('food-list-filter', 'home');
+          }}
           className="rounded-lg shadow-none h-10"
         >
           <Home size={16} className="mr-2" />
@@ -412,7 +424,10 @@ export default function ListPage() {
         <Button 
           variant={filter === 'out' ? 'default' : 'ghost'} 
           size="sm" 
-          onClick={() => setFilter('out')}
+          onClick={() => {
+            setFilter('out');
+            sessionStorage.setItem('food-list-filter', 'out');
+          }}
           className="rounded-lg shadow-none h-10"
         >
           <Utensils size={16} className="mr-2" />
@@ -435,7 +450,11 @@ export default function ListPage() {
               {/* Main Content Container with Button */}
               <div 
                 className="flex gap-3 items-center p-4 pr-6 cursor-pointer relative"
-                onClick={() => setLocation(`/add?id=${item.id}`)}
+                onClick={() => {
+                  // Save current filter before navigating
+                  sessionStorage.setItem('food-list-filter', filter);
+                  setLocation(`/add?id=${item.id}`);
+                }}
               >
                 <div className={cn(
                   "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 relative flex-shrink-0",
@@ -506,10 +525,12 @@ export default function ListPage() {
                      size="icon" 
                      className="h-12 w-12 text-muted-foreground/50 hover:text-foreground !flex-shrink-0 !shrink-0"
                      style={{ flexShrink: 0 }}
-                     onClick={(e) => {
-                       e.stopPropagation();
-                       setLocation(`/add?id=${item.id}`);
-                     }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Save current filter before navigating
+                      sessionStorage.setItem('food-list-filter', filter);
+                      setLocation(`/add?id=${item.id}`);
+                    }}
                    >
                      <ChevronRight size={24} />
                    </Button>
