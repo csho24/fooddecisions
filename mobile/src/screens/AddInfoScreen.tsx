@@ -51,6 +51,9 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
   
   // Category modal state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<string[]>(FOOD_CATEGORIES);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   
   // Expiry state (for Add Info main screen)
   const [mainStep, setMainStep] = useState<'main' | 'closure' | 'expiry'>('main');
@@ -122,17 +125,55 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
     }
 
     // Use saved category if exists, otherwise auto-categorize
-    const currentCategory = (selectedItem.category && FOOD_CATEGORIES.includes(selectedItem.category))
-      ? selectedItem.category
-      : categorizeFood(selectedItem.name);
+    const getCurrentCategory = (): string => {
+      if (selectedItem.category && availableCategories.includes(selectedItem.category)) {
+        return selectedItem.category;
+      }
+      return categorizeFood(selectedItem.name);
+    };
+    const currentCategory = getCurrentCategory();
+    
+    const handleSelectCategory = async (categoryName: string) => {
+      try {
+        await updateItem(selectedItem.id, { category: categoryName });
+        Alert.alert('Category Updated', `Set to ${categoryName}`);
+        setShowCategoryModal(false);
+      } catch (error) {
+        console.error('Failed to update category:', error);
+        Alert.alert('Error', 'Failed to update category');
+      }
+    };
+
+    const handleAddNewCategory = async () => {
+      const trimmedName = newCategoryName.trim();
+      if (!trimmedName) return;
+      
+      // Add to available categories if not exists
+      if (!availableCategories.includes(trimmedName)) {
+        setAvailableCategories([...availableCategories, trimmedName]);
+      }
+      
+      // Assign this new category to the selected item
+      await handleSelectCategory(trimmedName);
+      
+      setNewCategoryName('');
+      setShowAddCategoryModal(false);
+    };
+
+    // Navigate back to FoodLists with the correct tab
+    const handleBack = () => {
+      const activeTab = selectedItem?.type || 'out';
+      navigation.navigate('FoodLists', { activeTab });
+    };
 
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color="#111827" />
           </TouchableOpacity>
-          <Text style={styles.title}>Edit Info</Text>
+          <View style={{ width: 24 }} />
+          <View style={{ flex: 1 }} />
           <View style={{ width: 24 }} />
         </View>
 
@@ -215,6 +256,16 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Categories</Text>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => {
+                  setNewCategoryName('');
+                  setShowAddCategoryModal(true);
+                }}
+              >
+                <Ionicons name="add" size={16} color="#111827" />
+                <Text style={styles.addButtonText}>Add Category</Text>
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity
@@ -240,7 +291,7 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
                     style: 'destructive',
                     onPress: async () => {
                       await removeItem(selectedItem.id);
-                      navigation.goBack();
+                      handleBack();
                     }
                   }
                 ]
@@ -382,23 +433,14 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
             <View style={styles.categoryModalContent}>
               <Text style={styles.modalTitle}>Change Category</Text>
               <View style={styles.categoryList}>
-                {FOOD_CATEGORIES.map((cat) => (
+                {availableCategories.map((cat) => (
                   <TouchableOpacity
                     key={cat}
                     style={[
                       styles.categoryOption,
                       currentCategory === cat && styles.categoryOptionSelected
                     ]}
-                    onPress={async () => {
-                      try {
-                        await updateItem(selectedItem.id, { category: cat });
-                        setShowCategoryModal(false);
-                        Alert.alert('Category Updated', `Set to ${cat}`);
-                      } catch (error) {
-                        console.error('Failed to update category:', error);
-                        Alert.alert('Error', 'Failed to update category');
-                      }
-                    }}
+                    onPress={() => handleSelectCategory(cat)}
                   >
                     <Text style={[
                       styles.categoryOptionText,
@@ -414,6 +456,44 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
                 onPress={() => setShowCategoryModal(false)}
               >
                 <Text style={styles.cancelButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Add Category Modal */}
+        <Modal
+          visible={showAddCategoryModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowAddCategoryModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add New Category</Text>
+                <TouchableOpacity onPress={() => setShowAddCategoryModal(false)}>
+                  <Ionicons name="close" size={24} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalBody}>
+                <Text style={styles.inputLabel}>Category Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newCategoryName}
+                  onChangeText={setNewCategoryName}
+                  placeholder="e.g. Pizza, Dessert, Drinks..."
+                  autoCapitalize="words"
+                />
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.saveButton, !newCategoryName.trim() && styles.saveButtonDisabled]}
+                onPress={handleAddNewCategory}
+                disabled={!newCategoryName.trim()}
+              >
+                <Text style={styles.saveButtonText}>Add Category</Text>
               </TouchableOpacity>
             </View>
           </View>

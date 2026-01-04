@@ -741,8 +741,15 @@ export default function AddPage() {
     );
   }
 
+  // Handle back navigation - go back to list with preserved filter
+  const handleEditBack = () => {
+    const savedFilter = sessionStorage.getItem('food-list-filter');
+    const filterParam = savedFilter && (savedFilter === 'home' || savedFilter === 'out') ? `?filter=${savedFilter}` : '';
+    setLocation(`/list${filterParam}`);
+  };
+
   return (
-    <Layout showBack title="Edit Info">
+    <Layout showBack onBack={handleEditBack}>
       <div className="mb-6">
         <h2 className="font-bold text-xl">{selectedItem?.name}</h2>
       </div>
