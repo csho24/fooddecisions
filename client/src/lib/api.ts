@@ -73,6 +73,8 @@ export interface ClosureSchedule {
   type: 'cleaning' | 'timeoff';
   date: string;
   location?: string;
+  foodItemId?: string;
+  foodItemName?: string;
   createdAt: string;
 }
 
@@ -83,7 +85,7 @@ export async function getClosureSchedules(): Promise<ClosureSchedule[]> {
 }
 
 export async function createClosureSchedules(
-  schedules: Array<{ type: 'cleaning' | 'timeoff'; date: string; location?: string }>
+  schedules: Array<{ type: 'cleaning' | 'timeoff'; date: string; location?: string; foodItemId?: string; foodItemName?: string }>
 ): Promise<ClosureSchedule[]> {
   const response = await fetch("/api/closures", {
     method: "POST",

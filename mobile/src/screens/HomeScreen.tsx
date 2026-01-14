@@ -1,12 +1,31 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getClosureSchedules, ClosureSchedule } from '../api';
 
 interface HomeScreenProps {
   navigation: any;
 }
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
+  const [todaysClosures, setTodaysClosures] = useState<ClosureSchedule[]>([]);
+
+  useEffect(() => {
+    // Fetch closures and filter for today
+    getClosureSchedules()
+      .then(closures => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+        
+        const todayClosures = closures.filter(c => c.date === todayStr);
+        setTodaysClosures(todayClosures);
+      })
+      .catch(err => console.error('Failed to fetch closures:', err));
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -18,6 +37,28 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       </View>
 
       <View style={styles.buttonsContainer}>
+        {/* Closure Alert Banner */}
+        {todaysClosures.length > 0 && (
+          <View style={styles.closureBanner}>
+            <View style={styles.closureBannerIcon}>
+              <Ionicons name="alert-circle" size={18} color="#D97706" />
+            </View>
+            <View style={styles.closureBannerContent}>
+              <Text style={styles.closureBannerTitle}>Closed Today</Text>
+              {todaysClosures.map((c, i) => (
+                <Text key={i} style={styles.closureBannerText}>
+                  {c.location && c.foodItemName 
+                    ? `${c.location} › ${c.foodItemName}` 
+                    : c.foodItemName || c.location}
+                  <Text style={styles.closureBannerType}>
+                    {' '}({c.type === 'cleaning' ? 'Cleaning' : 'Time Off'})
+                  </Text>
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* DECIDE - Big card at top */}
         <TouchableOpacity
           style={styles.decideCard}
@@ -201,5 +242,41 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -10,
     bottom: -10,
+  },
+  // Closure Banner
+  closureBanner: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  closureBannerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closureBannerContent: {
+    flex: 1,
+  },
+  closureBannerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  closureBannerText: {
+    fontSize: 14,
+    color: '#B45309',
+  },
+  closureBannerType: {
+    fontSize: 12,
+    color: '#D97706',
   },
 });

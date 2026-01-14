@@ -78,7 +78,9 @@ export const closureSchedules = pgTable("closure_schedules", {
   id: serial("id").primaryKey(),
   type: text("type").notNull(), // 'cleaning' | 'timeoff'
   date: text("date").notNull(), // ISO date string
-  location: text("location"), // Only for cleaning
+  location: text("location"), // Location name (e.g., "Ghim Moh")
+  foodItemId: text("food_item_id"), // Links to specific food item
+  foodItemName: text("food_item_name"), // Name of the food item for display
   createdAt: text("created_at").notNull().default(sql`(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')`),
 });
 
@@ -86,6 +88,8 @@ export const insertClosureScheduleSchema = createInsertSchema(closureSchedules, 
   type: z.enum(['cleaning', 'timeoff']),
   date: z.string(),
   location: z.string().optional(),
+  foodItemId: z.string().optional(),
+  foodItemName: z.string().optional(),
 }).omit({ id: true, createdAt: true });
 
 export type InsertClosureSchedule = z.infer<typeof insertClosureScheduleSchema>;

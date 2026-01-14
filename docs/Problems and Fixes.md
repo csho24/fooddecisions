@@ -4,6 +4,286 @@ This document tracks specific problems encountered and their solutions.
 
 ---
 
+# January 14, 2025 - Closure Calendar Feature Fixes
+
+**Date:** January 14, 2025  
+**Status:** ✅ All issues resolved
+
+---
+
+## Overview
+
+Building out the Closure feature (tracking when stalls are closed for cleaning or time off) encountered multiple issues related to calendar date handling, state persistence, and UI/UX.
+
+---
+
+## Issue 1: Date Timezone Shift (16th Saving as 15th)
+
+### Problem
+When selecting January 16 on the calendar, it would save as January 15 in the database.
+
+### Root Cause
+Using `date.toISOString().split('T')[0]` converts the local date to UTC, which in Singapore (UTC+8) can shift the date backwards.
+
+```typescript
+// BAD: Shifts date to UTC
+date.toISOString().split('T')[0]  // Jan 16 00:00 SGT → Jan 15 16:00 UTC
+```
+
+### Solution
+Use local date methods instead of ISO string:
+
+```typescript
+// GOOD: Keeps local date
+const year = date.getFullYear();
+const month = String(date.getMonth() + 1).padStart(2, '0');
+const day = String(date.getDate()).padStart(2, '0');
+const dateStr = `${year}-${month}-${day}`;
+```
+
+Applied to both:
+- Saving closures to database
+- Parsing saved dates for display on calendar
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 2: Calendar Dates Not Persisting
+
+### Problem
+Selected closure dates would disappear when:
+- Navigating to another tab/page
+- After clicking save
+
+### Root Cause
+Dates were only stored in React state, not fetched from the database. After saving, the state was cleared.
+
+### Solution
+1. **Fetch saved closures on screen load:**
+```typescript
+useEffect(() => {
+  if (closureStep === 'cleaning' || closureStep === 'timeoff') {
+    getClosureSchedules()
+      .then(closures => setSavedClosures(closures))
+      .catch(err => console.error('Failed to fetch closures:', err));
+  }
+}, [closureStep]);
+```
+
+2. **Display saved dates on calendar:**
+```typescript
+selected={[...getSavedDatesForType('cleaning'), ...selectedCleaningDates]}
+```
+
+3. **Refetch after saving:**
+```typescript
+await createClosureSchedules(schedules);
+const updated = await getClosureSchedules();
+setSavedClosures(updated);
+```
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 3: Saved Dates Could Be Deselected
+
+### Problem
+Users could click on already-saved closure dates and deselect them, which was confusing (it didn't delete them from database).
+
+### Solution
+Filter out saved dates from the selection handler:
+
+```typescript
+onSelect={(dates) => {
+  if (!dates) {
+    setSelectedCleaningDates([]);
+    return;
+  }
+  // Only keep newly selected dates, not saved ones
+  const newDates = dates.filter(d => 
+    !isDateSaved(d, 'cleaning') && !isDateSaved(d, 'timeoff')
+  );
+  setSelectedCleaningDates(newDates);
+}}
+```
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 4: Cleaning and Time Off Calendars Not Synced
+
+### Problem
+Cleaning and Time Off are both "closure" types but used separate calendars. Dates saved in one didn't show in the other.
+
+### Solution
+Both calendars now show ALL closure dates:
+- Current type's dates: Fully highlighted, can't be deselected
+- Other type's dates: Different color, disabled (can't be selected)
+
+```typescript
+// In Cleaning calendar, show Time Off dates as disabled
+disabled={(date) => isDateSaved(date, 'timeoff')}
+modifiers={{
+  timeoff: getSavedDatesForType('timeoff')
+}}
+modifiersStyles={{
+  timeoff: { 
+    backgroundColor: '#f59e0b', 
+    color: '#ffffff',
+    opacity: 0.8
+  }
+}}
+```
+
+### Color Coding
+- **Blue** = Cleaning dates
+- **Amber/Orange** = Time Off dates
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 5: Location Input Sides Cut Off
+
+### Problem
+The location input field had its left and right edges slightly clipped.
+
+### Root Cause
+`ScrollArea` component had `-mx-4 px-4` classes that were causing overflow issues.
+
+### Solution
+Removed the negative margin hack, used simpler `overflow-y-auto`:
+
+```typescript
+// Before
+<ScrollArea className="flex-1 -mx-4 px-4">
+
+// After
+<div className="flex-1 flex flex-col space-y-4 pb-8 overflow-y-auto">
+```
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 6: Food Item Not Being Saved with Closure
+
+### Problem
+User selected a food item (e.g., "Duck Rice") for the closure, but it wasn't being saved to the database.
+
+### Root Cause
+The `createClosureSchedules` call wasn't including `foodItemId` and `foodItemName`.
+
+### Solution
+1. **Added columns to schema:**
+```typescript
+export const closureSchedules = pgTable("closure_schedules", {
+  // ... existing fields
+  foodItemId: text("food_item_id"),
+  foodItemName: text("food_item_name"),
+});
+```
+
+2. **Updated save call:**
+```typescript
+const schedules = selectedCleaningDates.map(date => ({
+  type: 'cleaning' as const,
+  date: `${year}-${month}-${day}`,
+  location: cleaningLocation.trim(),
+  foodItemId: selectedClosureFoodItem?.id,
+  foodItemName: selectedClosureFoodItem?.name
+}));
+```
+
+3. **Created migration:**
+```sql
+ALTER TABLE closure_schedules 
+ADD COLUMN IF NOT EXISTS food_item_id TEXT;
+
+ALTER TABLE closure_schedules 
+ADD COLUMN IF NOT EXISTS food_item_name TEXT;
+```
+
+### Files Changed
+- `shared/schema.ts`
+- `client/src/lib/api.ts`
+- `client/src/pages/add-details.tsx`
+- `server/migrations/004_add_food_item_to_closures.sql`
+
+---
+
+## Issue 7: Today's Highlight Clashing with Time Off Color
+
+### Problem
+The calendar's "today" highlight was similar yellow to Time Off dates, making it hard to distinguish.
+
+### Solution
+Removed the today background highlight, keeping only the text color difference:
+
+```typescript
+modifiersStyles={{
+  // ... other modifiers
+  today: {
+    backgroundColor: 'transparent',
+    fontWeight: 'normal'
+  }
+}}
+```
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Lessons Learned
+
+1. **Always use local date methods in Singapore timezone** - Never use `toISOString()` for date-only values as it converts to UTC
+
+2. **Persist calendar state to database** - Don't rely solely on React state for data that should survive navigation
+
+3. **Show all related data on same calendar** - Cleaning and Time Off are both "closures" so should be visible together
+
+4. **Provide visual feedback for saved vs unsaved** - Saved dates should look different and not be toggleable
+
+5. **Show context for data** - A colored date is meaningless without knowing which food item it refers to
+
+---
+
+## Migration Required
+
+Run this SQL on Neon to add food item columns:
+
+```sql
+ALTER TABLE closure_schedules 
+ADD COLUMN IF NOT EXISTS food_item_id TEXT;
+
+ALTER TABLE closure_schedules 
+ADD COLUMN IF NOT EXISTS food_item_name TEXT;
+```
+
+---
+
+## Status
+
+**✅ All Issues Resolved** - January 14, 2025
+
+Closure calendar feature now working with:
+- Correct date handling (no timezone shift)
+- Persistent saved dates
+- Synced Cleaning/Time Off calendars
+- Food item association
+- Proper UI styling
+
+---
+
 # December 23, 2024 - Category System Fix
 
 **Date:** December 23, 2024  

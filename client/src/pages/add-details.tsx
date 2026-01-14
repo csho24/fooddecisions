@@ -18,7 +18,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSavedLocations } from "@/hooks/use-saved-locations";
 import { Search, ChevronDown, Home, Utensils, Clock, Plus, MapPin, X, Trash2, Calendar as CalendarIcon, Sparkles } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
-import { createClosureSchedules } from "@/lib/api";
+import { createClosureSchedules, getClosureSchedules, ClosureSchedule } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { categorizeFood } from "@/lib/food-categories";
@@ -88,6 +88,45 @@ export default function AddPage() {
   const [selectedCleaningDates, setSelectedCleaningDates] = useState<Date[]>([]);
   const [selectedTimeOffDates, setSelectedTimeOffDates] = useState<Date[]>([]);
   const [cleaningLocation, setCleaningLocation] = useState("");
+  const [selectedClosureFoodItem, setSelectedClosureFoodItem] = useState<FoodItem | null>(null);
+  const [savedClosures, setSavedClosures] = useState<ClosureSchedule[]>([]);
+
+  // Fetch saved closures when entering closure screens
+  useEffect(() => {
+    if (closureStep === 'cleaning' || closureStep === 'timeoff') {
+      getClosureSchedules()
+        .then(closures => setSavedClosures(closures))
+        .catch(err => console.error('Failed to fetch closures:', err));
+    }
+  }, [closureStep]);
+
+  // Get saved dates for a specific type (parse as local date to avoid timezone shift)
+  const getSavedDatesForType = (type: 'cleaning' | 'timeoff'): Date[] => {
+    return savedClosures
+      .filter(c => c.type === type)
+      .map(c => {
+        const [year, month, day] = c.date.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      });
+  };
+
+  // Check if a date is saved (can't be deselected)
+  const isDateSaved = (date: Date, type: 'cleaning' | 'timeoff'): boolean => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    return savedClosures.some(c => c.type === type && c.date === dateStr);
+  };
+
+  // Get closure info for a date (for tooltip)
+  const getClosureForDate = (date: Date): ClosureSchedule | undefined => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    return savedClosures.find(c => c.date === dateStr);
+  };
   
   // Expiry State
   const [selectedExpiryCategory, setSelectedExpiryCategory] = useState<'Fridge' | 'Snacks' | null>(null);
@@ -348,7 +387,15 @@ export default function AddPage() {
         setClosureStep('main');
       }
     } else if (closureStep === 'closure' || closureStep === 'cleaning' || closureStep === 'timeoff') {
-      if (closureStep === 'cleaning' || closureStep === 'timeoff') {
+      if (closureStep === 'cleaning') {
+        setSelectedCleaningDates([]);
+        setCleaningLocation("");
+        setSelectedClosureFoodItem(null);
+        setClosureStep('closure');
+      } else if (closureStep === 'timeoff') {
+        setSelectedTimeOffDates([]);
+        setCleaningLocation("");
+        setSelectedClosureFoodItem(null);
         setClosureStep('closure');
       } else {
         setClosureStep('main');
@@ -366,8 +413,9 @@ export default function AddPage() {
       if (selectedExpiryCategory) return selectedExpiryCategory;
       return 'Expiry';
     }
-    if (closureStep === 'cleaning') return 'Cleaning';
-    if (closureStep === 'timeoff') return 'Time Off';
+    // No title for cleaning/timeoff - shown as h3 in content
+    if (closureStep === 'cleaning') return '';
+    if (closureStep === 'timeoff') return '';
     if (closureStep === 'closure') return 'Closure';
     return 'Add Info';
   };
@@ -378,7 +426,7 @@ export default function AddPage() {
 
     return (
       <Layout showBack title={getTitle()} onBack={handleBack}>
-        <div className="space-y-4 h-full flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {closureStep === 'main' ? (
             <div className="grid grid-cols-1 gap-4">
               <Button 
@@ -432,22 +480,69 @@ export default function AddPage() {
               </div>
             </div>
           ) : closureStep === 'cleaning' ? (
-            <div className="space-y-4">
+            <div className="flex-1 flex flex-col space-y-4 pb-8 overflow-y-auto">
               <h3 className="font-bold text-lg">Cleaning Days</h3>
               <Calendar
                 mode="multiple"
-                selected={[...selectedCleaningDates, ...selectedTimeOffDates]}
-                onSelect={(dates) => setSelectedCleaningDates(dates || [])}
-                className="rounded-xl border w-full scale-110 origin-top"
+                selected={[...getSavedDatesForType('cleaning'), ...selectedCleaningDates]}
+                onSelect={(dates) => {
+                  if (!dates) {
+                    setSelectedCleaningDates([]);
+                    return;
+                  }
+                  // Filter out saved dates (both types) - only keep newly selected ones
+                  const newDates = dates.filter(d => 
+                    !isDateSaved(d, 'cleaning') && !isDateSaved(d, 'timeoff')
+                  );
+                  setSelectedCleaningDates(newDates);
+                }}
+                disabled={(date) => isDateSaved(date, 'timeoff')}
+                modifiers={{
+                  timeoff: getSavedDatesForType('timeoff')
+                }}
+                modifiersStyles={{
+                  timeoff: { 
+                    backgroundColor: '#f59e0b', 
+                    color: '#ffffff',
+                    opacity: 0.8
+                  },
+                  today: {
+                    backgroundColor: 'transparent',
+                    fontWeight: 'normal'
+                  }
+                }}
+                className="rounded-xl border w-full"
               />
+              {/* Show scheduled closures list */}
+              {savedClosures.length > 0 && (
+                <div className="space-y-1.5 bg-muted/30 rounded-xl p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Scheduled Closures:</p>
+                  {savedClosures.slice(0, 8).map((c, i) => (
+                    <div key={i} className={cn(
+                      "text-xs px-2 py-1 rounded flex justify-between",
+                      c.type === 'cleaning' ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-700"
+                    )}>
+                      <span>
+                        {c.location && c.foodItemName 
+                          ? `${c.location} › ${c.foodItemName}` 
+                          : c.foodItemName || c.location}
+                      </span>
+                      <span className="opacity-70">{c.date.split('-')[2]}/{c.date.split('-')[1]} • {c.type === 'cleaning' ? 'Clean' : 'Off'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {selectedCleaningDates.length > 0 && (
-                <>
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Location</Label>
                     <Input 
-                      placeholder="Enter cleaning location"
+                      placeholder="e.g. Ghim Moh, Maxwell..."
                       value={cleaningLocation}
-                      onChange={(e) => setCleaningLocation(e.target.value)}
+                      onChange={(e) => {
+                        setCleaningLocation(e.target.value);
+                        setSelectedClosureFoodItem(null);
+                      }}
                       onBlur={(e) => {
                         const capitalized = capitalizeWords(e.target.value);
                         setCleaningLocation(capitalized);
@@ -455,25 +550,79 @@ export default function AddPage() {
                       className="h-12 rounded-xl"
                     />
                   </div>
+                  
+                  {cleaningLocation.trim() && (() => {
+                    const matchingItems = items.filter(item => 
+                      item.type === 'out' && 
+                      item.locations?.some(loc => 
+                        loc.name.toLowerCase().includes(cleaningLocation.toLowerCase())
+                      )
+                    );
+                    
+                    if (matchingItems.length === 0) {
+                      return (
+                        <div className="text-center py-3 text-muted-foreground bg-muted/20 rounded-xl border border-dashed text-sm">
+                          <p>No food items found with "{cleaningLocation}"</p>
+                          <p className="text-xs mt-1">Add this location to a food item first</p>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div className="space-y-2">
+                        <Label>Which stall?</Label>
+                        <div className="space-y-1.5">
+                          {matchingItems.map(item => (
+                            <Button
+                              key={item.id}
+                              type="button"
+                              variant={selectedClosureFoodItem?.id === item.id ? "default" : "outline"}
+                              className="w-full h-auto py-2.5 px-3 text-left justify-start rounded-xl text-sm"
+                              onClick={() => setSelectedClosureFoodItem(
+                                selectedClosureFoodItem?.id === item.id ? null : item
+                              )}
+                            >
+                              <span className="font-medium">{item.name}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  
                   <Button 
                     onClick={async () => {
                       try {
-                        const schedules = selectedCleaningDates.map(date => ({
-                          type: 'cleaning' as const,
-                          date: date.toISOString().split('T')[0],
-                          location: cleaningLocation.trim()
-                        }));
+                        const schedules = selectedCleaningDates.map(date => {
+                          // Format as local date (YYYY-MM-DD) to avoid timezone shift
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          return {
+                            type: 'cleaning' as const,
+                            date: `${year}-${month}-${day}`,
+                            location: cleaningLocation.trim(),
+                            foodItemId: selectedClosureFoodItem?.id,
+                            foodItemName: selectedClosureFoodItem?.name
+                          };
+                        });
                         
                         await createClosureSchedules(schedules);
                         
+                        // Refetch to show saved dates
+                        const updated = await getClosureSchedules();
+                        setSavedClosures(updated);
+                        
+                        const itemName = selectedClosureFoodItem?.name || cleaningLocation;
                         toast({ 
                           title: "Saved!", 
-                          description: `${selectedCleaningDates.length} cleaning day${selectedCleaningDates.length !== 1 ? 's' : ''} saved.` 
+                          description: `${itemName} closed for cleaning on ${selectedCleaningDates.length} day${selectedCleaningDates.length !== 1 ? 's' : ''}.` 
                         });
                         
-                        // Reset state
+                        // Reset for next entry
                         setSelectedCleaningDates([]);
                         setCleaningLocation("");
+                        setSelectedClosureFoodItem(null);
                       } catch (error) {
                         console.error('Error saving cleaning schedule:', error);
                         toast({ 
@@ -484,54 +633,172 @@ export default function AddPage() {
                       }
                     }}
                     className="w-full h-14 text-lg rounded-xl"
-                    disabled={!cleaningLocation.trim()}
+                    disabled={!cleaningLocation.trim() || !selectedClosureFoodItem}
                   >
                     Save
                   </Button>
-                </>
+                </div>
               )}
             </div>
           ) : closureStep === 'timeoff' ? (
-            <div className="space-y-4">
+            <div className="flex-1 flex flex-col space-y-4 pb-8 overflow-y-auto">
               <h3 className="font-bold text-lg">Time Off</h3>
               <Calendar
                 mode="multiple"
-                selected={[...selectedCleaningDates, ...selectedTimeOffDates]}
-                onSelect={(dates) => setSelectedTimeOffDates(dates || [])}
-                disabled={(date) => date < today}
-                className="rounded-xl border w-full scale-110 origin-top"
+                selected={[...getSavedDatesForType('timeoff'), ...selectedTimeOffDates]}
+                onSelect={(dates) => {
+                  if (!dates) {
+                    setSelectedTimeOffDates([]);
+                    return;
+                  }
+                  // Filter out saved dates (both types) and past dates - only keep newly selected ones
+                  const newDates = dates.filter(d => 
+                    !isDateSaved(d, 'timeoff') && !isDateSaved(d, 'cleaning') && d >= today
+                  );
+                  setSelectedTimeOffDates(newDates);
+                }}
+                disabled={(date) => date < today || isDateSaved(date, 'cleaning')}
+                modifiers={{
+                  cleaning: getSavedDatesForType('cleaning')
+                }}
+                modifiersStyles={{
+                  cleaning: { 
+                    backgroundColor: '#3b82f6', 
+                    color: '#ffffff',
+                    opacity: 0.8
+                  },
+                  today: {
+                    backgroundColor: 'transparent',
+                    fontWeight: 'normal'
+                  }
+                }}
+                className="rounded-xl border w-full"
               />
+              {/* Show scheduled closures list */}
+              {savedClosures.length > 0 && (
+                <div className="space-y-1.5 bg-muted/30 rounded-xl p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Scheduled Closures:</p>
+                  {savedClosures.slice(0, 8).map((c, i) => (
+                    <div key={i} className={cn(
+                      "text-xs px-2 py-1 rounded flex justify-between",
+                      c.type === 'cleaning' ? "bg-primary/10 text-primary" : "bg-amber-100 text-amber-700"
+                    )}>
+                      <span>
+                        {c.location && c.foodItemName 
+                          ? `${c.location} › ${c.foodItemName}` 
+                          : c.foodItemName || c.location}
+                      </span>
+                      <span className="opacity-70">{c.date.split('-')[2]}/{c.date.split('-')[1]} • {c.type === 'cleaning' ? 'Clean' : 'Off'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {selectedTimeOffDates.length > 0 && (
-                <Button 
-                  onClick={async () => {
-                    try {
-                      const schedules = selectedTimeOffDates.map(date => ({
-                        type: 'timeoff' as const,
-                        date: date.toISOString().split('T')[0]
-                      }));
-                      
-                      await createClosureSchedules(schedules);
-                      
-                      toast({ 
-                        title: "Saved!", 
-                        description: `${selectedTimeOffDates.length} time off day${selectedTimeOffDates.length !== 1 ? 's' : ''} saved.` 
-                      });
-                      
-                      // Reset state
-                      setSelectedTimeOffDates([]);
-                    } catch (error) {
-                      console.error('Error saving time off schedule:', error);
-                      toast({ 
-                        title: "Error", 
-                        description: "Failed to save time off schedule.",
-                        variant: "destructive"
-                      });
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Location</Label>
+                    <Input 
+                      placeholder="e.g. Ghim Moh, Maxwell..."
+                      value={cleaningLocation}
+                      onChange={(e) => {
+                        setCleaningLocation(e.target.value);
+                        setSelectedClosureFoodItem(null);
+                      }}
+                      onBlur={(e) => {
+                        const capitalized = capitalizeWords(e.target.value);
+                        setCleaningLocation(capitalized);
+                      }}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                  
+                  {cleaningLocation.trim() && (() => {
+                    const matchingItems = items.filter(item => 
+                      item.type === 'out' && 
+                      item.locations?.some(loc => 
+                        loc.name.toLowerCase().includes(cleaningLocation.toLowerCase())
+                      )
+                    );
+                    
+                    if (matchingItems.length === 0) {
+                      return (
+                        <div className="text-center py-3 text-muted-foreground bg-muted/20 rounded-xl border border-dashed text-sm">
+                          <p>No food items found with "{cleaningLocation}"</p>
+                          <p className="text-xs mt-1">Add this location to a food item first</p>
+                        </div>
+                      );
                     }
-                  }}
-                  className="w-full h-14 text-lg rounded-xl"
-                >
-                  Save
-                </Button>
+                    
+                    return (
+                      <div className="space-y-2">
+                        <Label>Which stall?</Label>
+                        <div className="space-y-1.5">
+                          {matchingItems.map(item => (
+                            <Button
+                              key={item.id}
+                              type="button"
+                              variant={selectedClosureFoodItem?.id === item.id ? "default" : "outline"}
+                              className="w-full h-auto py-2.5 px-3 text-left justify-start rounded-xl text-sm"
+                              onClick={() => setSelectedClosureFoodItem(
+                                selectedClosureFoodItem?.id === item.id ? null : item
+                              )}
+                            >
+                              <span className="font-medium">{item.name}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  
+                  <Button 
+                    onClick={async () => {
+                      try {
+                        const schedules = selectedTimeOffDates.map(date => {
+                          // Format as local date (YYYY-MM-DD) to avoid timezone shift
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          return {
+                            type: 'timeoff' as const,
+                            date: `${year}-${month}-${day}`,
+                            location: cleaningLocation.trim(),
+                            foodItemId: selectedClosureFoodItem?.id,
+                            foodItemName: selectedClosureFoodItem?.name
+                          };
+                        });
+                        
+                        await createClosureSchedules(schedules);
+                        
+                        // Refetch to show saved dates
+                        const updated = await getClosureSchedules();
+                        setSavedClosures(updated);
+                        
+                        const itemName = selectedClosureFoodItem?.name || cleaningLocation;
+                        toast({ 
+                          title: "Saved!", 
+                          description: `${itemName} time off on ${selectedTimeOffDates.length} day${selectedTimeOffDates.length !== 1 ? 's' : ''}.` 
+                        });
+                        
+                        // Reset for next entry
+                        setSelectedTimeOffDates([]);
+                        setCleaningLocation("");
+                        setSelectedClosureFoodItem(null);
+                      } catch (error) {
+                        console.error('Error saving time off schedule:', error);
+                        toast({ 
+                          title: "Error", 
+                          description: "Failed to save time off schedule.",
+                          variant: "destructive"
+                        });
+                      }
+                    }}
+                    className="w-full h-14 text-lg rounded-xl"
+                    disabled={!cleaningLocation.trim() || !selectedClosureFoodItem}
+                  >
+                    Save
+                  </Button>
+                </div>
               )}
             </div>
           ) : closureStep === 'expiry' ? (

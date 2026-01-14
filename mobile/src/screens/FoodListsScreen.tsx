@@ -13,16 +13,18 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useFoodStore } from '../store';
 import { FoodType, FoodItem } from '../types';
 
 interface FoodListsScreenProps {
   navigation: any;
+  route: any;
 }
 
-export default function FoodListsScreen({ navigation }: FoodListsScreenProps) {
+export default function FoodListsScreen({ navigation, route }: FoodListsScreenProps) {
   const { items, isLoading, fetchItems, addItem, removeItem, archiveItem } = useFoodStore();
-  const [activeTab, setActiveTab] = useState<FoodType>('home');
+  const [activeTab, setActiveTab] = useState<FoodType>(route.params?.activeTab || 'home');
   const [newItemName, setNewItemName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Fridge');
   const [archiveModalVisible, setArchiveModalVisible] = useState(false);
@@ -31,6 +33,20 @@ export default function FoodListsScreen({ navigation }: FoodListsScreenProps) {
   useEffect(() => {
     fetchItems();
   }, []);
+
+  // Sync activeTab to route params so it persists across navigation
+  useEffect(() => {
+    navigation.setParams({ activeTab });
+  }, [activeTab, navigation]);
+
+  // Preserve activeTab when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (route.params?.activeTab) {
+        setActiveTab(route.params.activeTab);
+      }
+    }, [route.params?.activeTab])
+  );
 
   const filteredItems = items
     .filter(item => item.type === activeTab)

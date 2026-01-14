@@ -430,9 +430,7 @@ Or run with sudo if permission issues.
 
 **Verify connection:** When properly connected, pressing `r` should trigger a reload on the phone immediately.
 
-### Prevention
-
-If you're on a network where LAN mode doesn't work (corporate networks, VPNs, different subnets):
+### PreventionIf you're on a network where LAN mode doesn't work (corporate networks, VPNs, different subnets):
 - Always use `npx expo start --tunnel`
 - Or ensure phone and computer are on exact same WiFi network with no isolation
 
@@ -453,4 +451,3 @@ npx expo start --tunnel --clear
 All the cache clearing in the world won't help if the phone can't reach the server. Check connection first by pressing `r` in terminal.
 
 **Status:** ✅ Resolved - Use tunnel mode when LAN mode doesn't work
-

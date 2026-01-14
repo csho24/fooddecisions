@@ -1,8 +1,10 @@
 import { Layout } from "@/components/mobile-layout";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Utensils, List, Plus, ChefHat, Store, Brain } from "lucide-react";
+import { Utensils, List, Plus, ChefHat, Store, AlertCircle } from "lucide-react";
 import bgPattern from "@assets/generated_images/subtle_abstract_food_pattern_background.png";
+import { useEffect, useState } from "react";
+import { getClosureSchedules, ClosureSchedule } from "@/lib/api";
 
 const container = {
   hidden: { opacity: 0 },
@@ -20,6 +22,24 @@ const item = {
 };
 
 export default function Home() {
+  const [todaysClosures, setTodaysClosures] = useState<ClosureSchedule[]>([]);
+
+  useEffect(() => {
+    // Fetch closures and filter for today
+    getClosureSchedules()
+      .then(closures => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+        
+        const todayClosures = closures.filter(c => c.date === todayStr);
+        setTodaysClosures(todayClosures);
+      })
+      .catch(err => console.error('Failed to fetch closures:', err));
+  }, []);
+
   return (
     <Layout>
       {/* Background Pattern */}
@@ -30,12 +50,7 @@ export default function Home() {
 
       <div className="flex-1 flex flex-col justify-center gap-6 py-8">
         <div className="mb-4 px-2">
-          <div className="mb-2">
-            <div className="flex items-center gap-2">
-              <h1 className="text-4xl font-bold text-primary tracking-tight">Food<br/>Decisions</h1>
-              <Brain size={20} className="text-primary/60" />
-            </div>
-          </div>
+          <h1 className="text-4xl font-bold text-primary mb-2 tracking-tight">Food<br/><span className="text-foreground italic">Faster</span></h1>
           <p className="text-muted-foreground text-lg">what and where shall we eat today?</p>
         </div>
 
@@ -45,6 +60,33 @@ export default function Home() {
           animate="show"
           className="grid gap-4 flex-1"
         >
+          {/* Closure Alert Banner */}
+          {todaysClosures.length > 0 && (
+            <motion.div 
+              variants={item}
+              className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3"
+            >
+              <div className="bg-amber-100 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <AlertCircle size={18} className="text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-amber-800 text-sm mb-1">Closed Today</p>
+                <div className="space-y-1">
+                  {todaysClosures.map((c, i) => (
+                    <p key={i} className="text-amber-700 text-sm">
+                      {c.location && c.foodItemName 
+                        ? `${c.location} › ${c.foodItemName}` 
+                        : c.foodItemName || c.location}
+                      <span className="text-amber-500 ml-1.5 text-xs">
+                        ({c.type === 'cleaning' ? 'Cleaning' : 'Time Off'})
+                      </span>
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Decide Card */}
           <Link href="/decide">
             <motion.div 

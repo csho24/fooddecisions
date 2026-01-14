@@ -52,3 +52,32 @@ export async function createArchive(data: Omit<ArchivedItem, 'id'>): Promise<Arc
   const item = await response.json();
   return { ...item, id: item.id.toString(), itemId: item.itemId.toString() };
 }
+
+// Closure Schedules
+export interface ClosureSchedule {
+  id: number;
+  type: 'cleaning' | 'timeoff';
+  date: string;
+  location?: string;
+  foodItemId?: string;
+  foodItemName?: string;
+  createdAt: string;
+}
+
+export async function getClosureSchedules(): Promise<ClosureSchedule[]> {
+  const response = await fetch(`${API_URL}/api/closures`);
+  if (!response.ok) throw new Error('Failed to fetch closure schedules');
+  return await response.json();
+}
+
+export async function createClosureSchedules(
+  schedules: Array<{ type: 'cleaning' | 'timeoff'; date: string; location?: string; foodItemId?: string; foodItemName?: string }>
+): Promise<ClosureSchedule[]> {
+  const response = await fetch(`${API_URL}/api/closures`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ schedules }),
+  });
+  if (!response.ok) throw new Error('Failed to create closure schedules');
+  return await response.json();
+}

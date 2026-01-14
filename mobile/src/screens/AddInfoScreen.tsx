@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFoodStore } from '../store';
 import { FoodItem, FoodType, LocationDetail } from '../types';
+import { getClosureSchedules, createClosureSchedules, ClosureSchedule } from '../api';
 
 interface AddInfoScreenProps {
   navigation: any;
@@ -56,14 +57,108 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
   const [newCategoryName, setNewCategoryName] = useState('');
   
   // Expiry state (for Add Info main screen)
-  const [mainStep, setMainStep] = useState<'main' | 'closure' | 'expiry'>('main');
+  const [mainStep, setMainStep] = useState<'main' | 'closure' | 'cleaning' | 'timeoff' | 'expiry'>('main');
   const [selectedExpiryCategory, setSelectedExpiryCategory] = useState<'Fridge' | 'Snacks' | null>(null);
   const [selectedExpiryItem, setSelectedExpiryItem] = useState<FoodItem | null>(null);
   const [expiryDateInput, setExpiryDateInput] = useState('');
+  
+  // Closure calendar state
+  const [savedClosures, setSavedClosures] = useState<ClosureSchedule[]>([]);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [closureLocation, setClosureLocation] = useState('');
+  const [selectedClosureFoodItem, setSelectedClosureFoodItem] = useState<FoodItem | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
     fetchItems();
   }, []);
+
+  // Fetch closures when entering closure screens
+  useEffect(() => {
+    if (mainStep === 'cleaning' || mainStep === 'timeoff') {
+      getClosureSchedules()
+        .then(closures => setSavedClosures(closures))
+        .catch(err => console.error('Failed to fetch closures:', err));
+    }
+  }, [mainStep]);
+
+  // Get saved dates for a specific type
+  const getSavedDatesForType = (type: 'cleaning' | 'timeoff'): Date[] => {
+    return savedClosures
+      .filter(c => c.type === type)
+      .map(c => {
+        const [year, month, day] = c.date.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      });
+  };
+
+  // Check if a date is saved
+  const isDateSaved = (date: Date, type: 'cleaning' | 'timeoff'): boolean => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    return savedClosures.some(c => c.type === type && c.date === dateStr);
+  };
+
+  // Get closure for a date (for display)
+  const getClosureForDate = (date: Date): ClosureSchedule | undefined => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    return savedClosures.find(c => c.date === dateStr);
+  };
+
+  // Check if date is selected
+  const isDateSelected = (date: Date): boolean => {
+    return selectedDates.some(d => 
+      d.getFullYear() === date.getFullYear() &&
+      d.getMonth() === date.getMonth() &&
+      d.getDate() === date.getDate()
+    );
+  };
+
+  // Toggle date selection
+  const toggleDateSelection = (date: Date, type: 'cleaning' | 'timeoff') => {
+    const otherType = type === 'cleaning' ? 'timeoff' : 'cleaning';
+    // Don't allow selecting if already saved for other type
+    if (isDateSaved(date, otherType)) return;
+    // Don't allow deselecting saved dates
+    if (isDateSaved(date, type)) return;
+    
+    if (isDateSelected(date)) {
+      setSelectedDates(selectedDates.filter(d => 
+        !(d.getFullYear() === date.getFullYear() &&
+          d.getMonth() === date.getMonth() &&
+          d.getDate() === date.getDate())
+      ));
+    } else {
+      setSelectedDates([...selectedDates, date]);
+    }
+  };
+
+  // Generate calendar days for current month
+  const getCalendarDays = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const days: (Date | null)[] = [];
+    
+    // Add empty slots for days before first day of month
+    const startDay = firstDay.getDay();
+    for (let i = 0; i < startDay; i++) {
+      days.push(null);
+    }
+    
+    // Add all days of the month
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      days.push(new Date(year, month, d));
+    }
+    
+    return days;
+  };
 
   // Format expiry date input
   const formatExpiryInput = (text: string) => {
@@ -517,6 +612,11 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
       } else {
         setMainStep('main');
       }
+    } else if (mainStep === 'cleaning' || mainStep === 'timeoff') {
+      setSelectedDates([]);
+      setClosureLocation('');
+      setSelectedClosureFoodItem(null);
+      setMainStep('closure');
     } else if (mainStep === 'closure') {
       setMainStep('main');
     } else {
@@ -530,6 +630,9 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
       if (selectedExpiryCategory) return selectedExpiryCategory;
       return 'Expiry';
     }
+    // No title for cleaning/timeoff - shown in content
+    if (mainStep === 'cleaning') return '';
+    if (mainStep === 'timeoff') return '';
     if (mainStep === 'closure') return 'Closure';
     return 'Add Info';
   };
@@ -586,20 +689,246 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
         </View>
 
         <View style={styles.cardsContainer}>
-          <TouchableOpacity style={styles.mainCard}>
+          <TouchableOpacity 
+            style={styles.mainCard}
+            onPress={() => setMainStep('cleaning')}
+          >
             <View style={[styles.cardIcon, { backgroundColor: '#DBEAFE' }]}>
               <Ionicons name="sparkles" size={28} color="#2563EB" />
             </View>
             <Text style={styles.cardTitle}>Cleaning</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.mainCard}>
+          <TouchableOpacity 
+            style={styles.mainCard}
+            onPress={() => setMainStep('timeoff')}
+          >
             <View style={[styles.cardIcon, { backgroundColor: '#FEF3C7' }]}>
               <Ionicons name="calendar" size={28} color="#D97706" />
             </View>
             <Text style={styles.cardTitle}>Time Off</Text>
           </TouchableOpacity>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Cleaning/Time Off Calendar Screen
+  if (mainStep === 'cleaning' || mainStep === 'timeoff') {
+    const closureType = mainStep;
+    const otherType = closureType === 'cleaning' ? 'timeoff' : 'cleaning';
+    const calendarDays = getCalendarDays();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const matchingItems = closureLocation.trim() 
+      ? items.filter(item => 
+          item.type === 'out' && 
+          item.locations?.some(loc => 
+            loc.name.toLowerCase().includes(closureLocation.toLowerCase())
+          )
+        )
+      : [];
+
+    const handleSave = async () => {
+      try {
+        const schedules = selectedDates.map(date => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return {
+            type: closureType as 'cleaning' | 'timeoff',
+            date: `${year}-${month}-${day}`,
+            location: closureLocation.trim(),
+            foodItemId: selectedClosureFoodItem?.id,
+            foodItemName: selectedClosureFoodItem?.name
+          };
+        });
+        
+        await createClosureSchedules(schedules);
+        
+        // Refetch to show saved dates
+        const updated = await getClosureSchedules();
+        setSavedClosures(updated);
+        
+        const itemName = selectedClosureFoodItem?.name || closureLocation;
+        Alert.alert('Saved!', `${itemName} ${closureType === 'cleaning' ? 'cleaning' : 'time off'} on ${selectedDates.length} day${selectedDates.length !== 1 ? 's' : ''}.`);
+        
+        // Reset for next entry
+        setSelectedDates([]);
+        setClosureLocation('');
+        setSelectedClosureFoodItem(null);
+      } catch (error) {
+        console.error('Error saving closure schedule:', error);
+        Alert.alert('Error', 'Failed to save closure schedule.');
+      }
+    };
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.title}>{getTitle()}</Text>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView style={styles.calendarContainer}>
+          <Text style={styles.calendarTitle}>
+            {closureType === 'cleaning' ? 'Cleaning Days' : 'Time Off'}
+          </Text>
+
+          {/* Calendar */}
+          <View style={styles.calendar}>
+            {/* Month Navigation */}
+            <View style={styles.monthNav}>
+              <TouchableOpacity onPress={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}>
+                <Ionicons name="chevron-back" size={24} color="#374151" />
+              </TouchableOpacity>
+              <Text style={styles.monthTitle}>
+                {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
+              </Text>
+              <TouchableOpacity onPress={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}>
+                <Ionicons name="chevron-forward" size={24} color="#374151" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Weekday Headers */}
+            <View style={styles.weekdayRow}>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                <Text key={i} style={styles.weekdayText}>{d}</Text>
+              ))}
+            </View>
+
+            {/* Calendar Grid */}
+            <View style={styles.calendarGrid}>
+              {calendarDays.map((date, index) => {
+                if (!date) {
+                  return <View key={`empty-${index}`} style={styles.dayCell} />;
+                }
+
+                const isPast = closureType === 'timeoff' && date < today;
+                const isSavedCurrent = isDateSaved(date, closureType);
+                const isSavedOther = isDateSaved(date, otherType);
+                const isSelected = isDateSelected(date);
+                const closure = getClosureForDate(date);
+
+                return (
+                  <TouchableOpacity
+                    key={date.toISOString()}
+                    style={[
+                      styles.dayCell,
+                      isSelected && styles.dayCellSelected,
+                      isSavedCurrent && (closureType === 'cleaning' ? styles.dayCellCleaning : styles.dayCellTimeoff),
+                      isSavedOther && (closureType === 'cleaning' ? styles.dayCellTimeoff : styles.dayCellCleaning),
+                      isPast && styles.dayCellDisabled,
+                    ]}
+                    onPress={() => !isPast && toggleDateSelection(date, closureType)}
+                    disabled={isPast}
+                  >
+                    <Text style={[
+                      styles.dayText,
+                      isSelected && styles.dayTextSelected,
+                      (isSavedCurrent || isSavedOther) && styles.dayTextSaved,
+                      isPast && styles.dayTextDisabled,
+                    ]}>
+                      {date.getDate()}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Scheduled Closures List */}
+          {savedClosures.length > 0 && (
+            <View style={styles.closuresList}>
+              <Text style={styles.closuresListTitle}>Scheduled Closures:</Text>
+              {savedClosures.slice(0, 8).map((c, i) => (
+                <View key={i} style={[
+                  styles.closureItem,
+                  c.type === 'cleaning' ? styles.closureItemCleaning : styles.closureItemTimeoff
+                ]}>
+                  <Text style={[
+                    styles.closureItemText,
+                    c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
+                  ]}>
+                    {c.location && c.foodItemName 
+                      ? `${c.location} › ${c.foodItemName}` 
+                      : c.foodItemName || c.location}
+                  </Text>
+                  <Text style={[
+                    styles.closureItemDate,
+                    c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
+                  ]}>
+                    {c.date.split('-')[2]}/{c.date.split('-')[1]} • {c.type === 'cleaning' ? 'Clean' : 'Off'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Location Input - only show when dates selected */}
+          {selectedDates.length > 0 && (
+            <View style={styles.locationSection}>
+              <Text style={styles.inputLabel}>Location</Text>
+              <TextInput
+                style={styles.input}
+                value={closureLocation}
+                onChangeText={(text) => {
+                  setClosureLocation(text);
+                  setSelectedClosureFoodItem(null);
+                }}
+                placeholder="e.g. Ghim Moh, Maxwell..."
+              />
+
+              {/* Matching Food Items */}
+              {closureLocation.trim() && matchingItems.length === 0 && (
+                <View style={styles.noMatchBox}>
+                  <Text style={styles.noMatchText}>No food items found with "{closureLocation}"</Text>
+                  <Text style={styles.noMatchSubtext}>Add this location to a food item first</Text>
+                </View>
+              )}
+
+              {matchingItems.length > 0 && (
+                <View style={styles.foodItemsSection}>
+                  <Text style={styles.inputLabel}>Which stall?</Text>
+                  {matchingItems.map(item => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        styles.foodItemButton,
+                        selectedClosureFoodItem?.id === item.id && styles.foodItemButtonSelected
+                      ]}
+                      onPress={() => setSelectedClosureFoodItem(
+                        selectedClosureFoodItem?.id === item.id ? null : item
+                      )}
+                    >
+                      <Text style={[
+                        styles.foodItemButtonText,
+                        selectedClosureFoodItem?.id === item.id && styles.foodItemButtonTextSelected
+                      ]}>
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  (!closureLocation.trim() || !selectedClosureFoodItem) && styles.saveButtonDisabled
+                ]}
+                onPress={handleSave}
+                disabled={!closureLocation.trim() || !selectedClosureFoodItem}
+              >
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -1204,5 +1533,170 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontSize: 16,
     fontWeight: '500',
+  },
+  // Calendar styles
+  calendarContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  calendarTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  calendar: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  monthNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  monthTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  weekdayText: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dayCell: {
+    width: '14.28%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  dayCellSelected: {
+    backgroundColor: '#111827',
+  },
+  dayCellCleaning: {
+    backgroundColor: '#3B82F6',
+  },
+  dayCellTimeoff: {
+    backgroundColor: '#F59E0B',
+  },
+  dayCellDisabled: {
+    opacity: 0.3,
+  },
+  dayText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  dayTextSelected: {
+    color: '#FFFFFF',
+  },
+  dayTextSaved: {
+    color: '#FFFFFF',
+  },
+  dayTextDisabled: {
+    color: '#9CA3AF',
+  },
+  closuresList: {
+    marginTop: 16,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 12,
+  },
+  closuresListTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  closureItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  closureItemCleaning: {
+    backgroundColor: 'rgba(17, 24, 39, 0.1)',
+  },
+  closureItemTimeoff: {
+    backgroundColor: '#FEF3C7',
+  },
+  closureItemText: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+  closureTextCleaning: {
+    color: '#111827',
+  },
+  closureTextTimeoff: {
+    color: '#B45309',
+  },
+  closureItemDate: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  locationSection: {
+    marginTop: 16,
+    paddingBottom: 24,
+  },
+  noMatchBox: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#D1D5DB',
+  },
+  noMatchText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  noMatchSubtext: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  foodItemsSection: {
+    marginTop: 8,
+  },
+  foodItemButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  foodItemButtonSelected: {
+    backgroundColor: '#111827',
+    borderColor: '#111827',
+  },
+  foodItemButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  foodItemButtonTextSelected: {
+    color: '#FFFFFF',
   },
 });

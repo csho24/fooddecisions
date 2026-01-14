@@ -2,7 +2,7 @@
 
 This document explains how the Food Compass website works, covering architectural decisions, design patterns, and key implementation strategies.
 
-**Last Updated:** December 23, 2024
+**Last Updated:** January 14, 2026
 
 ---
 
@@ -207,46 +207,92 @@ if (lower.includes('noodle') || lower.includes('mee') || lower.includes('laksa')
 
 ## 4. Closure Schedule System
 
-Manages eatery closure schedules for cleaning days and time off. Both types share a unified calendar showing all closure dates.
+Manages eatery closure schedules for cleaning days and time off. Both types share a unified calendar showing all closure dates with food item associations.
 
 ### Files
-- UI: `client/src/pages/add-details.tsx`
+- Web UI: `client/src/pages/add-details.tsx`
+- Web Home Banner: `client/src/pages/home.tsx`
+- Mobile UI: `mobile/src/screens/AddInfoScreen.tsx`
+- Mobile Home Banner: `mobile/src/screens/HomeScreen.tsx`
 - Schema: `shared/schema.ts` - `closureSchedules` table
 - Storage: `server/storage.ts` - `bulkCreateClosureSchedules()`
 - Routes: `server/routes.ts` - `/api/closures`
-- API: `client/src/lib/api.ts` - `createClosureSchedules()`
+- Web API: `client/src/lib/api.ts` - `createClosureSchedules()`
+- Mobile API: `mobile/src/api.ts` - `createClosureSchedules()`
 
 ### Database
 
 **Table:** `closure_schedules`
 - `type`: 'cleaning' | 'timeoff'
 - `date`: ISO date string (YYYY-MM-DD)
-- `location`: Text (required for cleaning, null for timeoff)
+- `location`: Text (e.g., "Ghim Moh")
+- `food_item_id`: Text (optional, links to food item)
+- `food_item_name`: Text (optional, denormalized for display)
 - Indexed on `date` and `type`
 
 ### UI Flow
 
 1. Main → "Closure" card
-2. Closure → "Cleaning" and "Time Off" cards
+2. Closure → "Cleaning" and "Time Off" cards (no header title, shown as h3 in content)
 3. Each opens multi-select calendar
-4. Calendar shows ALL selected dates (cleaning + timeoff combined)
-5. Cleaning requires location input, Time Off doesn't
+4. Calendar shows saved dates (cleaning=blue, timeoff=amber)
+5. After selecting dates, enter location → select matching food item from list
 6. Time Off only allows future dates
-7. Saves multiple dates in single API call
+7. Saves multiple dates in single API call with food item association
+
+### Display Format
+
+**Closure List (Jan 14, 2026):**
+```typescript
+// Shows "Location › Food" format when both exist
+{c.location && c.foodItemName 
+  ? `${c.location} › ${c.foodItemName}` 
+  : c.foodItemName || c.location}
+```
+
+Example: `Ghim Moh › Duck Rice` instead of just `Ghim` or `Duck Rice`
+
+### Home Page Alert Banner
+
+When today has scheduled closures, an alert banner appears on the home page (both web and mobile):
+
+```typescript
+// Fetch and filter for today
+const todayStr = `${year}-${month}-${day}`;
+const todayClosures = closures.filter(c => c.date === todayStr);
+
+// Display banner if closures exist
+{todaysClosures.length > 0 && (
+  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+    <p className="font-semibold">Closed Today</p>
+    {todaysClosures.map(c => (
+      <p>{c.location} › {c.foodItemName} ({c.type})</p>
+    ))}
+  </div>
+)}
+```
 
 ### Implementation
 
-**Unified Calendar:**
+**Food Item Matching:**
 ```typescript
-selected={[...selectedCleaningDates, ...selectedTimeOffDates]}
+// Find food items that have a location matching the input
+const matchingItems = items.filter(item => 
+  item.type === 'out' && 
+  item.locations?.some(loc => 
+    loc.name.toLowerCase().includes(closureLocation.toLowerCase())
+  )
+);
 ```
 
-**Bulk Creation:**
+**Bulk Creation with Food Item:**
 ```typescript
 const schedules = dates.map(date => ({
   type: 'cleaning',
-  date: date.toISOString().split('T')[0],
-  location: cleaningLocation
+  date: `${year}-${month}-${day}`,
+  location: closureLocation.trim(),
+  foodItemId: selectedClosureFoodItem?.id,
+  foodItemName: selectedClosureFoodItem?.name
 }));
 await createClosureSchedules(schedules);
 ```
@@ -254,6 +300,16 @@ await createClosureSchedules(schedules);
 **Date Restrictions:**
 - Cleaning: Any date
 - Time Off: `disabled={(date) => date < today}`
+
+### Mobile App Closure Calendar (Jan 14, 2026)
+
+Mobile app now has full calendar functionality matching web:
+- Custom calendar grid with month navigation
+- Date selection with tap to toggle
+- Shows saved cleaning dates in blue, time off in amber
+- Location input + food item selection
+- Scheduled closures list with "Location › Food" format
+- Home screen alert banner for today's closures
 
 ---
 
@@ -594,6 +650,30 @@ Sub-descriptions are ONLY allowed when the user explicitly provides them.
 
 ---
 
+### Avoid Repetitive Titles (Jan 14, 2026)
+
+When a screen has a title shown in the content (e.g., as an `<h3>`), don't also show it in the header next to the back button.
+
+```tsx
+// ❌ DON'T: Title in header AND in content
+<Layout showBack title="Cleaning">
+  <h3>Cleaning Days</h3>  // Repetitive!
+</Layout>
+
+// ✅ DO: Title only in content, empty header
+const getTitle = () => {
+  if (closureStep === 'cleaning') return '';  // No header title
+  if (closureStep === 'timeoff') return '';
+  return 'Add Info';
+};
+
+<Layout showBack title={getTitle()}>
+  <h3>Cleaning Days</h3>  // Only here
+</Layout>
+```
+
+---
+
 ## Database Migrations - MUST RUN SQL MANUALLY
 
 When adding new database columns, the SQL must be run manually in Neon console.
@@ -601,6 +681,12 @@ When adding new database columns, the SQL must be run manually in Neon console.
 ### Expiry Date Column (Dec 20, 2024)
 ```sql
 ALTER TABLE food_items ADD COLUMN IF NOT EXISTS expiry_date TEXT;
+```
+
+### Food Item Columns in Closures (Jan 14, 2026)
+```sql
+ALTER TABLE closure_schedules ADD COLUMN IF NOT EXISTS food_item_id TEXT;
+ALTER TABLE closure_schedules ADD COLUMN IF NOT EXISTS food_item_name TEXT;
 ```
 
 ### All Required Tables
@@ -632,6 +718,8 @@ CREATE TABLE IF NOT EXISTS closure_schedules (
   type TEXT NOT NULL,
   date TEXT NOT NULL,
   location TEXT,
+  food_item_id TEXT,
+  food_item_name TEXT,
   created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
 );
 ```
