@@ -33,39 +33,30 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-// Health check endpoint - register early so it's available during startup
-// This helps prevent 503 errors during cold starts
-app.get("/health", (_req, res) => {
-  try {
-    const timestamp = new Date().toISOString();
-    log(`Health check requested - responding with OK`);
-    res.status(200).json({ status: "ok", timestamp });
-  } catch (error) {
-    log(`Health check error: ${error instanceof Error ? error.message : String(error)}`, "error");
-    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
-  }
-});
-
-// Cron monitoring endpoint - tracks when cron hits the server
+// Health/cron endpoint - tracks when cron hits the server
 let cronHitCount = 0;
 let lastCronHit: string | null = null;
 const serverStartTime = new Date();
 
-app.get("/ping", (_req, res) => {
-  cronHitCount++;
-  lastCronHit = new Date().toISOString();
-  const uptime = Math.floor((Date.now() - serverStartTime.getTime()) / 1000);
-  
-  log(`🔔 Cron ping #${cronHitCount} received`);
-  
-  res.status(200).json({
-    status: "ok",
-    message: "pong",
-    cronHitCount,
-    lastCronHit,
-    serverUptime: `${uptime}s`,
-    serverStartTime: serverStartTime.toISOString()
-  });
+app.get("/health", (_req, res) => {
+  try {
+    cronHitCount++;
+    lastCronHit = new Date().toISOString();
+    const uptime = Math.floor((Date.now() - serverStartTime.getTime()) / 1000);
+    
+    log(`🔔 Cron hit #${cronHitCount}`);
+    
+    res.status(200).json({
+      status: "ok",
+      cronHitCount,
+      lastCronHit,
+      serverUptime: `${uptime}s`,
+      serverStartTime: serverStartTime.toISOString()
+    });
+  } catch (error) {
+    log(`Health check error: ${error instanceof Error ? error.message : String(error)}`, "error");
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  }
 });
 
 export function log(message: string, source = "express") {
