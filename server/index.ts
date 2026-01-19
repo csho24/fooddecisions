@@ -46,10 +46,26 @@ app.get("/health", (_req, res) => {
   }
 });
 
-// Simple ping endpoint for cron jobs to keep Render awake
-// Minimal processing - just returns 200 OK immediately
+// Cron monitoring endpoint - tracks when cron hits the server
+let cronHitCount = 0;
+let lastCronHit: string | null = null;
+const serverStartTime = new Date();
+
 app.get("/ping", (_req, res) => {
-  res.status(200).send("pong");
+  cronHitCount++;
+  lastCronHit = new Date().toISOString();
+  const uptime = Math.floor((Date.now() - serverStartTime.getTime()) / 1000);
+  
+  log(`🔔 Cron ping #${cronHitCount} received`);
+  
+  res.status(200).json({
+    status: "ok",
+    message: "pong",
+    cronHitCount,
+    lastCronHit,
+    serverUptime: `${uptime}s`,
+    serverStartTime: serverStartTime.toISOString()
+  });
 });
 
 export function log(message: string, source = "express") {
