@@ -46,6 +46,12 @@ app.get("/health", (_req, res) => {
   }
 });
 
+// Simple ping endpoint for cron jobs to keep Render awake
+// Minimal processing - just returns 200 OK immediately
+app.get("/ping", (_req, res) => {
+  res.status(200).send("pong");
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
