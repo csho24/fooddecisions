@@ -73,11 +73,11 @@ export default function Home() {
                 <p className="font-semibold text-amber-800 text-sm mb-1">Closed Today</p>
                 <div className="space-y-1">
                   {todaysClosures.map((c, i) => (
-                    <p key={i} className="text-amber-700 text-sm">
+                    <p key={i} className={c.type === 'cleaning' ? "text-blue-700 text-sm" : "text-amber-700 text-sm"}>
                       {c.location && c.foodItemName 
                         ? `${c.location} › ${c.foodItemName}` 
                         : c.foodItemName || c.location}
-                      <span className="text-amber-500 ml-1.5 text-xs">
+                      <span className={c.type === 'cleaning' ? "text-blue-500 ml-1.5 text-xs" : "text-amber-500 ml-1.5 text-xs"}>
                         ({c.type === 'cleaning' ? 'Cleaning' : 'Time Off'})
                       </span>
                     </p>

@@ -15,7 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFoodStore } from '../store';
 import { FoodItem, FoodType, LocationDetail } from '../types';
-import { getClosureSchedules, createClosureSchedules, ClosureSchedule } from '../api';
+import { getClosureSchedules, createClosureSchedules, deleteClosureSchedule, ClosureSchedule } from '../api';
 
 interface AddInfoScreenProps {
   navigation: any;
@@ -108,6 +108,40 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     return savedClosures.find(c => c.date === dateStr);
+  };
+
+  // Only show future/current closures in the "Scheduled Closures" list (past stay on calendar)
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  const upcomingClosures = savedClosures.filter((c: ClosureSchedule) => c.date >= todayStr);
+  const pastClosures = savedClosures.filter((c: ClosureSchedule) => c.date < todayStr);
+
+  // Resolve display location: use full location name from food item when available
+  const getClosureDisplayLocation = (c: ClosureSchedule): string => {
+    if (c.foodItemId && items.length > 0) {
+      const item = items.find((i: FoodItem) => i.id === c.foodItemId);
+      if (item?.locations?.length) {
+        const match = item.locations.find((loc: LocationDetail) =>
+          (c.location && loc.name.toLowerCase().includes(c.location.toLowerCase()))
+        );
+        return (match ?? item.locations[0]).name;
+      }
+    }
+    return c.location ?? '';
+  };
+
+  const handleDeleteClosure = async (id: number) => {
+    try {
+      await deleteClosureSchedule(id);
+      const updated = await getClosureSchedules();
+      setSavedClosures(updated);
+      Alert.alert('Deleted', 'Closure removed.');
+    } catch (err) {
+      console.error('Failed to delete closure:', err);
+      Alert.alert('Error', 'Failed to delete closure.');
+    }
   };
 
   // Check if date is selected
@@ -732,29 +766,54 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
 
     const handleSave = async () => {
       try {
-        const schedules = selectedDates.map(date => {
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          return {
-            type: closureType as 'cleaning' | 'timeoff',
-            date: `${year}-${month}-${day}`,
-            location: closureLocation.trim(),
-            foodItemId: selectedClosureFoodItem?.id,
-            foodItemName: selectedClosureFoodItem?.name
-          };
-        });
-        
-        await createClosureSchedules(schedules);
-        
-        // Refetch to show saved dates
-        const updated = await getClosureSchedules();
-        setSavedClosures(updated);
-        
-        const itemName = selectedClosureFoodItem?.name || closureLocation;
-        Alert.alert('Saved!', `${itemName} ${closureType === 'cleaning' ? 'cleaning' : 'time off'} on ${selectedDates.length} day${selectedDates.length !== 1 ? 's' : ''}.`);
-        
-        // Reset for next entry
+        if (closureType === 'cleaning') {
+          // Cleaning: all stalls at this location — one closure per (date × stall)
+          const fullLocation = matchingItems[0]?.locations?.find((loc: LocationDetail) =>
+            loc.name.toLowerCase().includes(closureLocation.toLowerCase())
+          )?.name ?? closureLocation.trim();
+          const schedules: Array<{ type: 'cleaning'; date: string; location: string; foodItemId?: string; foodItemName?: string }> = [];
+          for (const date of selectedDates) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+            for (const item of matchingItems) {
+              schedules.push({
+                type: 'cleaning',
+                date: dateStr,
+                location: fullLocation,
+                foodItemId: item.id,
+                foodItemName: item.name
+              });
+            }
+          }
+          await createClosureSchedules(schedules);
+          const updated = await getClosureSchedules();
+          setSavedClosures(updated);
+          Alert.alert('Saved!', `${fullLocation} — ${matchingItems.length} stall${matchingItems.length !== 1 ? 's' : ''} closed for cleaning on ${selectedDates.length} day${selectedDates.length !== 1 ? 's' : ''}.`);
+        } else {
+          // Time off: single stall
+          const fullLocation = selectedClosureFoodItem?.locations?.find((loc: LocationDetail) =>
+            loc.name.toLowerCase().includes(closureLocation.toLowerCase())
+          )?.name ?? closureLocation.trim();
+          const schedules = selectedDates.map(date => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return {
+              type: 'timeoff' as const,
+              date: `${year}-${month}-${day}`,
+              location: fullLocation,
+              foodItemId: selectedClosureFoodItem?.id,
+              foodItemName: selectedClosureFoodItem?.name
+            };
+          });
+          await createClosureSchedules(schedules);
+          const updated = await getClosureSchedules();
+          setSavedClosures(updated);
+          const itemName = selectedClosureFoodItem?.name || closureLocation;
+          Alert.alert('Saved!', `${itemName} time off on ${selectedDates.length} day${selectedDates.length !== 1 ? 's' : ''}.`);
+        }
         setSelectedDates([]);
         setClosureLocation('');
         setSelectedClosureFoodItem(null);
@@ -841,38 +900,86 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
             </View>
           </View>
 
-          {/* Scheduled Closures List */}
-          {savedClosures.length > 0 && (
+          {/* Scheduled Closures List (only future/current; past stay on calendar) */}
+          {upcomingClosures.length > 0 && (
             <View style={styles.closuresList}>
               <Text style={styles.closuresListTitle}>Scheduled Closures:</Text>
-              {savedClosures.slice(0, 8).map((c, i) => (
-                <View key={i} style={[
-                  styles.closureItem,
-                  c.type === 'cleaning' ? styles.closureItemCleaning : styles.closureItemTimeoff
-                ]}>
-                  <Text style={[
-                    styles.closureItemText,
-                    c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
+              {upcomingClosures.slice(0, 8).map((c) => {
+                const displayLoc = getClosureDisplayLocation(c);
+                return (
+                  <View key={c.id} style={[
+                    styles.closureItem,
+                    c.type === 'cleaning' ? styles.closureItemCleaning : styles.closureItemTimeoff,
+                    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }
                   ]}>
-                    {c.location && c.foodItemName 
-                      ? `${c.location} › ${c.foodItemName}` 
-                      : c.foodItemName || c.location}
-                  </Text>
-                  <Text style={[
-                    styles.closureItemDate,
-                    c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[
+                        styles.closureItemText,
+                        c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
+                      ]} numberOfLines={1}>
+                        {displayLoc && c.foodItemName 
+                          ? `${displayLoc} › ${c.foodItemName}` 
+                          : c.foodItemName || displayLoc}
+                      </Text>
+                      <Text style={[
+                        styles.closureItemDate,
+                        c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
+                      ]}>
+                        {c.date.split('-')[2]}/{c.date.split('-')[1]} • {c.type === 'cleaning' ? 'Clean' : 'Off'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleDeleteClosure(c.id)} style={{ padding: 8 }} accessibilityLabel="Delete closure">
+                      <Ionicons name="trash-outline" size={18} color="#b91c1c" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Past closures (with delete) */}
+          {pastClosures.length > 0 && (
+            <View style={[styles.closuresList, { backgroundColor: 'rgba(0,0,0,0.04)', marginTop: 8 }]}>
+              <Text style={[styles.closuresListTitle, { marginBottom: 8 }]}>Past closures</Text>
+              {pastClosures.slice(0, 20).map((c) => {
+                const displayLoc = getClosureDisplayLocation(c);
+                return (
+                  <View key={c.id} style={[
+                    styles.closureItem,
+                    c.type === 'cleaning' ? styles.closureItemCleaning : styles.closureItemTimeoff,
+                    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }
                   ]}>
-                    {c.date.split('-')[2]}/{c.date.split('-')[1]} • {c.type === 'cleaning' ? 'Clean' : 'Off'}
-                  </Text>
-                </View>
-              ))}
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[
+                        styles.closureItemText,
+                        c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
+                      ]} numberOfLines={1}>
+                        {displayLoc && c.foodItemName 
+                          ? `${displayLoc} › ${c.foodItemName}` 
+                          : c.foodItemName || displayLoc}
+                      </Text>
+                      <Text style={[
+                        styles.closureItemDate,
+                        c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
+                      ]}>
+                        {c.date.split('-')[2]}/{c.date.split('-')[1]} • {c.type === 'cleaning' ? 'Clean' : 'Off'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleDeleteClosure(c.id)} style={{ padding: 8 }} accessibilityLabel="Delete closure">
+                      <Ionicons name="trash-outline" size={18} color="#b91c1c" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </View>
           )}
 
           {/* Location Input - only show when dates selected */}
           {selectedDates.length > 0 && (
             <View style={styles.locationSection}>
-              <Text style={styles.inputLabel}>Location</Text>
+              <Text style={styles.inputLabel}>
+                {closureType === 'cleaning' ? 'Location (hawker centre / area)' : 'Location'}
+              </Text>
               <TextInput
                 style={styles.input}
                 value={closureLocation}
@@ -880,10 +987,14 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
                   setClosureLocation(text);
                   setSelectedClosureFoodItem(null);
                 }}
-                placeholder="e.g. Ghim Moh, Maxwell..."
+                placeholder={closureType === 'cleaning' ? 'e.g. Margaret Drive, Ghim Moh...' : 'e.g. Ghim Moh, Maxwell...'}
               />
+              {closureType === 'cleaning' && (
+                <Text style={[styles.noMatchSubtext, { marginTop: 4, color: '#6b7280' }]}>
+                  All stalls at this location will be marked closed for cleaning on the selected day(s).
+                </Text>
+              )}
 
-              {/* Matching Food Items */}
               {closureLocation.trim() && matchingItems.length === 0 && (
                 <View style={styles.noMatchBox}>
                   <Text style={styles.noMatchText}>No food items found with "{closureLocation}"</Text>
@@ -891,41 +1002,50 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
                 </View>
               )}
 
-              {matchingItems.length > 0 && (
-                <View style={styles.foodItemsSection}>
-                  <Text style={styles.inputLabel}>Which stall?</Text>
-                  {matchingItems.map(item => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[
-                        styles.foodItemButton,
-                        selectedClosureFoodItem?.id === item.id && styles.foodItemButtonSelected
-                      ]}
-                      onPress={() => setSelectedClosureFoodItem(
-                        selectedClosureFoodItem?.id === item.id ? null : item
-                      )}
-                    >
-                      <Text style={[
-                        styles.foodItemButtonText,
-                        selectedClosureFoodItem?.id === item.id && styles.foodItemButtonTextSelected
-                      ]}>
-                        {item.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+              {closureType === 'cleaning' && matchingItems.length > 0 && (
+                <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+                  <Text style={styles.saveButtonText}>Mark all {matchingItems.length} stalls closed</Text>
+                </TouchableOpacity>
               )}
 
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  (!closureLocation.trim() || !selectedClosureFoodItem) && styles.saveButtonDisabled
-                ]}
-                onPress={handleSave}
-                disabled={!closureLocation.trim() || !selectedClosureFoodItem}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
+              {closureType === 'timeoff' && (
+                <>
+                  {matchingItems.length > 0 && (
+                    <View style={styles.foodItemsSection}>
+                      <Text style={styles.inputLabel}>Which stall?</Text>
+                      {matchingItems.map(item => (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={[
+                            styles.foodItemButton,
+                            selectedClosureFoodItem?.id === item.id && styles.foodItemButtonSelected
+                          ]}
+                          onPress={() => setSelectedClosureFoodItem(
+                            selectedClosureFoodItem?.id === item.id ? null : item
+                          )}
+                        >
+                          <Text style={[
+                            styles.foodItemButtonText,
+                            selectedClosureFoodItem?.id === item.id && styles.foodItemButtonTextSelected
+                          ]}>
+                            {item.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[
+                      styles.saveButton,
+                      (!closureLocation.trim() || !selectedClosureFoodItem) && styles.saveButtonDisabled
+                    ]}
+                    onPress={handleSave}
+                    disabled={!closureLocation.trim() || !selectedClosureFoodItem}
+                  >
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           )}
         </ScrollView>
@@ -1633,7 +1753,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   closureItemCleaning: {
-    backgroundColor: 'rgba(17, 24, 39, 0.1)',
+    backgroundColor: '#DBEAFE',
   },
   closureItemTimeoff: {
     backgroundColor: '#FEF3C7',
@@ -1644,7 +1764,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   closureTextCleaning: {
-    color: '#111827',
+    color: '#1d4ed8',
   },
   closureTextTimeoff: {
     color: '#B45309',

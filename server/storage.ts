@@ -20,6 +20,7 @@ export interface IStorage {
   getClosureSchedules(): Promise<ClosureSchedule[]>;
   createClosureSchedule(schedule: InsertClosureSchedule): Promise<ClosureSchedule>;
   bulkCreateClosureSchedules(schedules: InsertClosureSchedule[]): Promise<ClosureSchedule[]>;
+  deleteClosureSchedule(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -87,6 +88,10 @@ export class DatabaseStorage implements IStorage {
     if (schedules.length === 0) return [];
     const results = await db.insert(closureSchedules).values(schedules).returning();
     return results;
+  }
+
+  async deleteClosureSchedule(id: number): Promise<void> {
+    await db.delete(closureSchedules).where(eq(closureSchedules.id, id));
   }
 }
 

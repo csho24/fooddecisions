@@ -156,5 +156,19 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/closures/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "Invalid closure id" });
+      }
+      await storage.deleteClosureSchedule(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting closure schedule:", error);
+      res.status(500).json({ error: "Failed to delete closure schedule", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   return httpServer;
 }

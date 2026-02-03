@@ -81,3 +81,8 @@ export async function createClosureSchedules(
   if (!response.ok) throw new Error('Failed to create closure schedules');
   return await response.json();
 }
+
+export async function deleteClosureSchedule(id: number): Promise<void> {
+  const response = await fetch(`${API_URL}/api/closures/${id}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error('Failed to delete closure schedule');
+}
