@@ -25,7 +25,7 @@ Everything we changed on web in this chat is listed below with **Applied to mobi
 | 9 | **Location input (closure):** Focus ring inset so edges don’t clip; `px-1` wrapper; label aligned with input | N/A (web only) | Low: if mobile location input feels misaligned, add matching horizontal padding. |
 | 10 | **Decide – hide header back:** When drilled into Go Out → Food (category) or Go Out → Location (location), hide header back; only “Back to Categories” / “Back to Locations” | ❌ No | Mobile Decide doesn’t have Location/Food drill yet; when you add it (section 2.3), also hide header back when drilled in. |
 
-**Summary:** Items 1–3, 5–7 are done on mobile. Item 4 (tooltip) and 9 (input alignment) are optional/low. Item 8 – **Home closure banner colors** still needs to be done on mobile. Item 10 – **Decide** (tabs + drill + hide back) is the big parity piece not yet on mobile.
+**Summary:** Items 1–3, 5–7 are done on mobile. Item 4 (tooltip) and 9 (input alignment) are optional/low. Item 8 – **Home closure banner colors** still needs to be done on mobile. Item 10 – **Decide** (tabs + drill + hide back) is the big parity piece not yet on mobile. **Items 11–17 are February 3, 2026 calendar fixes that need to be replicated on mobile.**
 
 ---
 
