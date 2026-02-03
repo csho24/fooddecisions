@@ -215,3 +215,40 @@ export const TIMEOFF_COLOR = "#f59e0b";
 ---
 
 **Bottom Line:** Start with sharing business logic. It's the quickest win and will immediately reduce duplication. Then evaluate if React Native Web makes sense for your use case.
+
+---
+
+## How to Use These Docs with AI
+
+### For Syncing Features/Fixes:
+
+**Use:** `Web_to_Mobile_Parity_Plan.md`
+
+**How:**
+1. Open the parity plan doc
+2. Find the section with the fixes you want (e.g., "Section 0c - February 3 Calendar Fixes")
+3. Tell AI: "Implement [Fix Name] from Web_to_Mobile_Parity_Plan.md section 0c"
+4. Or: "Sync items 11-17 from the parity plan to mobile"
+
+**Example prompts:**
+- "Implement Fix 1 (Multi-Date Selection) from Web_to_Mobile_Parity_Plan.md section 0c"
+- "Apply all February 3 calendar fixes (section 0c) to mobile"
+- "Check Web_to_Mobile_Parity_Plan.md and sync any unchecked items to mobile"
+
+### For Understanding Strategy:
+
+**Use:** `Mobile_Sync_Strategy.md`
+
+**When:** When you want to understand WHY things are duplicated, or explore long-term solutions.
+
+**Example prompts:**
+- "Read Mobile_Sync_Strategy.md and extract the shared utilities to shared/utils.ts"
+- "Based on Mobile_Sync_Strategy.md, what should I share between web and mobile?"
+
+### Best Practice:
+
+**For immediate fixes:** Use `Web_to_Mobile_Parity_Plan.md` - it has step-by-step instructions.
+
+**For long-term planning:** Use `Mobile_Sync_Strategy.md` - it explains the bigger picture.
+
+**You can reference both:** "Read both docs, then implement Fix 1 from the parity plan using the shared logic approach from the strategy doc"
