@@ -624,20 +624,22 @@ export default function AddPage() {
               )}
               {selectedCleaningDates.length > 0 && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2 px-1">
                     <Label>Location (hawker centre / area)</Label>
-                    <Input 
-                      placeholder="e.g. Margaret Drive, Ghim Moh, Maxwell..."
-                      value={cleaningLocation}
-                      onChange={(e) => {
-                        setCleaningLocation(e.target.value);
-                      }}
-                      onBlur={(e) => {
-                        const capitalized = capitalizeWords(e.target.value);
-                        setCleaningLocation(capitalized);
-                      }}
-                      className="h-12 rounded-xl"
-                    />
+                    <div className="min-w-0 overflow-visible">
+                      <Input 
+                        placeholder="e.g. Margaret Drive, Ghim Moh, Maxwell..."
+                        value={cleaningLocation}
+                        onChange={(e) => {
+                          setCleaningLocation(e.target.value);
+                        }}
+                        onBlur={(e) => {
+                          const capitalized = capitalizeWords(e.target.value);
+                          setCleaningLocation(capitalized);
+                        }}
+                        className="h-12 rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                      />
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       All stalls at this location will be marked closed for cleaning on the selected day(s).
                     </p>
@@ -814,21 +816,23 @@ export default function AddPage() {
               )}
               {selectedTimeOffDates.length > 0 && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2 px-1">
                     <Label>Location</Label>
-                    <Input 
-                      placeholder="e.g. Ghim Moh, Maxwell..."
-                      value={cleaningLocation}
-                      onChange={(e) => {
-                        setCleaningLocation(e.target.value);
-                        setSelectedClosureFoodItem(null);
-                      }}
-                      onBlur={(e) => {
-                        const capitalized = capitalizeWords(e.target.value);
-                        setCleaningLocation(capitalized);
-                      }}
-                      className="h-12 rounded-xl"
-                    />
+                    <div className="min-w-0 overflow-visible">
+                      <Input 
+                        placeholder="e.g. Ghim Moh, Maxwell..."
+                        value={cleaningLocation}
+                        onChange={(e) => {
+                          setCleaningLocation(e.target.value);
+                          setSelectedClosureFoodItem(null);
+                        }}
+                        onBlur={(e) => {
+                          const capitalized = capitalizeWords(e.target.value);
+                          setCleaningLocation(capitalized);
+                        }}
+                        className="h-12 rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                      />
+                    </div>
                   </div>
                   
                   {cleaningLocation.trim() && (() => {

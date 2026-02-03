@@ -217,9 +217,16 @@ export default function Decide() {
     );
   };
 
+  // Hide header back when drilled into Go Out → Food (category) or Go Out → Location (location detail);
+  // only the in-page "Back to Categories" / "Back to Locations" should show.
+  const hideHeaderBack = step === 'options' && selectedType === 'out' && (
+    (outTab === 'food' && selectedFoodCategory !== null) ||
+    (outTab === 'location' && selectedLocation !== null)
+  );
+
   return (
     <Layout 
-      showBack={true} 
+      showBack={!hideHeaderBack} 
       title={
         isSearching ? 'Search Results' : 
         (step === 'options' ? (selectedType === 'home' ? 'Eat at Home' : 'Go Out') : 'Decide')
