@@ -4,7 +4,7 @@ import { useFoodStore, FoodItem } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Home as HomeIcon, Store, ChevronRight, MapPin, Clock, AlertCircle, Search, X, Utensils } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, capitalizeWords } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
@@ -75,6 +75,7 @@ export default function Decide() {
   }, [items, selectedType, checkAvailability, searchQuery]);
 
   // Get unique locations from Out items
+  // Normalizes by spelling (case-insensitive) to prevent duplicates like "Margaret Drive" vs "Margaret drive"
   const uniqueLocations = useMemo(() => {
     if (selectedType !== 'out') return [];
     const locationMap = new Map<string, string>(); // lowercase key -> display name
@@ -84,8 +85,9 @@ export default function Decide() {
         if (item.locations && item.locations.length > 0) {
           item.locations.forEach(loc => {
             const normalizedKey = loc.name.trim().toLowerCase();
-            const displayName = loc.name.trim();
-            // Keep the first occurrence's capitalization
+            // Always use capitalized version for consistency
+            const displayName = capitalizeWords(loc.name.trim());
+            // Keep the first occurrence's normalized capitalization
             if (!locationMap.has(normalizedKey)) {
               locationMap.set(normalizedKey, displayName);
             }

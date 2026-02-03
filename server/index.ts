@@ -98,7 +98,7 @@ app.use((req, res, next) => {
 
 // Start server listening EARLY so health endpoint can respond immediately
 // This prevents 503 errors during cold starts when other routes are still initializing
-const port = parseInt(process.env.PORT || "8080", 10);
+const port = parseInt(process.env.PORT || "3001", 10);
 httpServer.listen(
   port,
   "0.0.0.0",
@@ -111,11 +111,30 @@ httpServer.listen(
 httpServer.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE") {
     log(`Port ${port} is already in use`, "error");
+    log(`Run: lsof -ti :${port} | xargs kill -9`, "error");
   } else {
     log(`Server error: ${err.message}`, "error");
   }
   process.exit(1);
 });
+
+// Graceful shutdown handlers - CRITICAL to prevent zombie processes
+const gracefulShutdown = (signal: string) => {
+  log(`Received ${signal}, shutting down gracefully...`);
+  httpServer.close(() => {
+    log("HTTP server closed");
+    process.exit(0);
+  });
+  
+  // Force close after 10 seconds
+  setTimeout(() => {
+    log("Forcing shutdown after timeout");
+    process.exit(1);
+  }, 10000);
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT")); // Ctrl+C
 
 // Add global error handlers to prevent crashes but log them
 process.on("uncaughtException", (err) => {
