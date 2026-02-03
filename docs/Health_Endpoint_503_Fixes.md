@@ -459,15 +459,32 @@ Even with 10-minute intervals (which should prevent the 15-minute spin-down), th
 - Interval set to 5 minutes
 - Monitoring to see if 5-minute interval prevents failures long-term
 
-**Key Insight:**
-The 10-minute interval logic was mathematically correct, but in practice, even small timing issues (delays, clock drift, processing time) can cause failures. The 5-minute interval provides a much larger safety margin to account for these real-world timing variations.
+**Key Insight - Mathematical Alignment Issue:**
+Even with perfect timing, failures can occur due to alignment:
+- Cron intervals are multiples of 5 (5, 10, 15 minutes)
+- Render spins down after 15 minutes
+- 15 is a multiple of 5 (5 × 3 = 15)
+- If cron start time aligns with Render's 15-minute check points, they can clash
+- Example: Cron hits at 10:00, 10:05, 10:10, 10:15... Render checks at 10:15, 10:30, 10:45... They align at 10:15, 10:30, etc.
+
+**It's luck-based** - depends on when server starts vs when cron starts. If they align, can still fail even with 5-minute intervals.
+
+### Potential Future Fix
+
+**Offset cron start time to avoid alignment:**
+- Check server start time from `/health` endpoint `serverStartTime`
+- Calculate offset (e.g., start cron at :02 or :07 instead of :00 or :05)
+- Avoid hitting Render's 15-minute check points
+- Requires knowing exact server start time and setting cron offset accordingly
+
+**Note:** Testing 5-minute intervals. May fail again depending on alignment. Hard to predict without knowing exact start times.
 
 ### Lessons Learned
 
-1. **Theoretical math ≠ real-world behavior:** 10 minutes < 15 minutes should work, but timing delays/offsets can still cause failures
-2. **Build in larger safety margins:** 5-minute intervals provide 10 minutes of buffer before spin-down threshold
+1. **Mathematical alignment matters:** Even with perfect timing, multiples can align (5 × 3 = 15)
+2. **Start time matters:** When cron starts vs when server starts determines if they align
 3. **Cron auto-disable is too aggressive:** Even temporary issues cause the cron to disable itself, leaving no protection
-4. **Free tier limitations:** Render's free tier has timing quirks that require more aggressive intervals than mathematically necessary
+4. **Free tier limitations:** Render's free tier requires aggressive intervals and still has alignment risks
 
 
 
