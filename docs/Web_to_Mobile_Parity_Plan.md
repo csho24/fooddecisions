@@ -29,6 +29,239 @@ Everything we changed on web in this chat is listed below with **Applied to mobi
 
 ---
 
+## 0c. February 3, 2026 Calendar Fixes - DETAILED Mobile Replication Steps
+
+**Date:** February 3, 2026  
+**Status:** ❌ Not applied to mobile  
+**Reference:** `docs/Calendar Problems and Fixes.md` (February 3, 2026 section)
+
+**⚠️ IMPORTANT:** These fixes are CRITICAL. Do NOT just say "copy web version" - follow these exact steps. The user has tried "copy web version" before and AI cannot properly duplicate it. Use these SPECIFIC instructions.
+
+### Fix 1: Multi-Date Selection (Cannot Select Multiple Dates)
+
+**Problem:** Mobile can only select one date at a time. Clicking a second date deselects the first.
+
+**Current Mobile Code Location:** `mobile/src/screens/AddInfoScreen.tsx` lines ~157-173 (`toggleDateSelection` function)
+
+**What's Wrong:**
+```typescript
+if (isDateSaved(date, type)) return; // ❌ WRONG - prevents selecting saved dates
+```
+
+**What to Change:**
+1. **Remove the check that prevents selecting saved dates:** Delete or comment out `if (isDateSaved(date, type)) return;`
+2. **Verify multiple dates accumulate:** The `setSelectedDates([...selectedDates, date])` should work, but ensure dates are deduplicated by timestamp
+3. **Add visual feedback:** Add orange border/ring style for selected dates (match web's orange ring around selected dates)
+
+**Web Reference:** `client/src/pages/add-details.tsx` lines 679-689 (onSelect handler), 733-734 (isInSelected check), 729 (orange ring className)
+
+**Exact Mobile Changes:**
+- Line ~162: Remove `if (isDateSaved(date, type)) return;`
+- Line ~171: Ensure `setSelectedDates([...selectedDates, date])` deduplicates by timestamp
+- Line ~891: Add selected style (orange border/ring) when `isSelected` is true
+
+---
+
+### Fix 2: Data Corruption Prevention (Saving for Wrong Dates)
+
+**Problem:** When saving, mobile might save for dates that already have this location saved, creating duplicates.
+
+**Current Mobile Code Location:** `mobile/src/screens/AddInfoScreen.tsx` lines ~775-793 (handleSave for cleaning)
+
+**What to Add:**
+1. **Before saving, filter out dates that already have this location:**
+   ```typescript
+   const existingDates = new Set(
+     savedClosures
+       .filter(c => c.type === 'cleaning' && normalizeLocKey(getClosureDisplayLocation(c)) === normalizeLocKey(fullLocation))
+       .map(c => c.date)
+   );
+   const newDates = selectedDates.filter(d => {
+     const dateStr = formatDate(d); // YYYY-MM-DD
+     return !existingDates.has(dateStr);
+   });
+   ```
+
+2. **Only save `newDates`, not all `selectedDates`**
+3. **Show toast with date range:** "Saved! Clementi — 9 stalls closed for cleaning on 23–24 Mar"
+
+**Web Reference:** `client/src/pages/add-details.tsx` lines 899-910 (filter existing dates), 939-949 (date range formatting)
+
+**Exact Mobile Changes:**
+- Before line ~775: Add filtering logic to exclude dates that already have this location
+- Use `newDates` instead of `selectedDates` in the save loop
+- Update Alert message to show date range (e.g., "23–24 Mar" for multiple dates)
+
+---
+
+### Fix 3: Dark Blue Logic (Count Distinct Locations, Not Stalls)
+
+**Problem:** Dark blue should only show when 2+ **different locations** are cleaning that day, not when one location has multiple stalls.
+
+**Current Mobile:** Check if mobile has dark blue logic. If not, add it.
+
+**What to Add:**
+1. **Add helper function to count distinct locations:**
+   ```typescript
+   const getCleaningLocationCountForDate = (date: Date): number => {
+     const year = date.getFullYear();
+     const month = String(date.getMonth() + 1).padStart(2, '0');
+     const day = String(date.getDate()).padStart(2, '0');
+     const dateStr = `${year}-${month}-${day}`;
+     const locs = new Set(
+       savedClosures
+         .filter(c => c.type === 'cleaning' && c.date === dateStr)
+         .map(c => {
+           const loc = getClosureDisplayLocation(c);
+           return loc.trim().toLowerCase(); // Normalize for comparison
+         })
+     );
+     return locs.size; // Number of distinct locations
+   };
+   ```
+
+2. **Apply darker blue style when `getCleaningLocationCountForDate(date) >= 2`**
+3. **Add darker blue style:** Create `dayCellCleaningDark` style (darker blue, e.g., `#1e40af`)
+
+**Web Reference:** `client/src/pages/add-details.tsx` lines 134-153 (getCleaningLocationCountForDate), 721 (shouldBeDarkBlue), 727 (darker blue className)
+
+**Exact Mobile Changes:**
+- Add `getCleaningLocationCountForDate` function (around line ~100, near other helper functions)
+- In calendar day rendering (line ~882): Check `getCleaningLocationCountForDate(date) >= 2` and apply darker blue style
+- Add `dayCellCleaningDark` style to StyleSheet (darker blue background)
+
+---
+
+### Fix 4: Location Capitalization Normalization
+
+**Problem:** Locations with different capitalization (e.g., "Margaret Drive" vs "Margaret drive") create duplicates.
+
+**What to Add:**
+1. **Add `capitalizeWords` utility function** (or import if shared utils exist):
+   ```typescript
+   const capitalizeWords = (str: string): string => {
+     return str
+       .split(' ')
+       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+       .join(' ');
+   };
+   ```
+
+2. **Normalize when saving:** Always capitalize before saving location
+3. **Normalize in `getClosureDisplayLocation`:** Always return capitalized location
+4. **Normalize in tooltip grouping** (if tooltips exist): Group by normalized key, display capitalized version
+
+**Web Reference:** 
+- `client/src/lib/utils.ts` (capitalizeWords function)
+- `client/src/pages/add-details.tsx` line 854 (capitalizeWords when setting fullLocation)
+- `client/src/pages/add-details.tsx` lines 177-201 (getClosureDisplayLocation always capitalizes)
+
+**Exact Mobile Changes:**
+- Add `capitalizeWords` function (or import from shared utils)
+- Line ~797 (timeoff): `const fullLocation = capitalizeWords(...);`
+- Line ~776 (cleaning): `const fullLocation = capitalizeWords(...);`
+- Update `getClosureDisplayLocation` to always capitalize returned location
+
+---
+
+### Fix 5: getClosureDisplayLocation Exact Match
+
+**Problem:** When a food item has multiple locations (e.g., Gimo and Clementi), it might show the wrong location.
+
+**Current Mobile Code Location:** Find `getClosureDisplayLocation` function in `AddInfoScreen.tsx`
+
+**What to Change:**
+1. **Try exact match first** (case-insensitive): `loc.name.trim().toLowerCase() === savedLoc.toLowerCase()`
+2. **Then try partial match** (for legacy data): `loc.name.toLowerCase().includes(savedLoc) || savedLoc.includes(loc.name.toLowerCase())`
+3. **Always capitalize result:** `return capitalizeWords(matchedLocation.name);`
+
+**Web Reference:** `client/src/pages/add-details.tsx` lines 177-201
+
+**Exact Mobile Changes:**
+- Update `getClosureDisplayLocation` function
+- First try: exact match (case-insensitive)
+- Second try: partial match (for legacy)
+- Always: capitalize the result before returning
+
+---
+
+### Fix 6: Remove Past Closures Section
+
+**Problem:** Mobile still shows "Past closures" section, web removed it.
+
+**Current Mobile Code Location:** `mobile/src/screens/AddInfoScreen.tsx` lines ~940-970
+
+**What to Remove:**
+- Find the View with "Past closures" title (around line 943)
+- Remove the entire View block that contains the past closures list
+- Keep past dates visible on calendar (they should still show blue/amber on calendar)
+
+**Web Reference:** Web removed lines 776-810 and 1209-1249 (Past closures Collapsible sections)
+
+**Exact Mobile Changes:**
+- Delete lines ~940-970 (the entire "Past closures" View section)
+- Past dates remain visible on calendar grid (no change needed there)
+
+---
+
+### Fix 7: Make Past Dates Selectable in Time Off
+
+**Problem:** Mobile disables past dates in Time Off calendar (`isPast && styles.dayCellDisabled`).
+
+**Current Mobile Code Location:** `mobile/src/screens/AddInfoScreen.tsx` lines ~870, ~886, ~884
+
+**What to Change:**
+1. **Line ~870:** Change `const isPast = closureType === 'timeoff' && date < today;` to `const isPast = false;` (or remove `isPast` entirely)
+2. **Line ~886:** Remove `!isPast &&` from `onPress` condition: `onPress={() => toggleDateSelection(date, closureType)}`
+3. **Line ~884:** Remove `isPast && styles.dayCellDisabled` from style array
+
+**Web Reference:** `client/src/pages/add-details.tsx` line 1127 (disabled only checks `isDateSaved(date, 'cleaning')`, not `date < today`)
+
+**Exact Mobile Changes:**
+- Line ~870: Remove or set `isPast = false` for timeoff
+- Line ~886: Remove `!isPast &&` condition
+- Line ~884: Remove `isPast && styles.dayCellDisabled` from styles array
+
+---
+
+### Fix 8: Selected Dates Banner
+
+**Problem:** Mobile doesn't show which dates are selected before saving.
+
+**What to Add:**
+1. **Show banner when `selectedDates.length > 0`**
+2. **Format:** "2 days — 9 Feb, 10 Feb" (or "1 day — 9 Feb")
+3. **Placement:** After calendar grid, before location input section (around line ~978)
+4. **Styling:** Simple text, no background/border (match web's muted text style)
+
+**Web Reference:** `client/src/pages/add-details.tsx` lines 805-812
+
+**Exact Mobile Changes:**
+- After calendar grid (around line ~901), before location section (line ~978)
+- Add View with Text showing: `{selectedDates.length} day{selectedDates.length !== 1 ? 's' : ''} — {formatted dates}`
+- Format dates: "9 Feb, 10 Feb" (use month abbreviations: Jan, Feb, Mar, etc.)
+- Style: Simple text, muted color, no background
+
+---
+
+### Summary Checklist for Mobile
+
+- [ ] **Fix 1:** Multi-date selection - Remove `isDateSaved(date, type)` check, ensure multiple dates accumulate, add orange border style
+- [ ] **Fix 2:** Filter duplicates before saving - Check existing dates for this location, only save new dates, show date range in toast
+- [ ] **Fix 3:** Dark blue logic - Add `getCleaningLocationCountForDate`, apply darker blue when >= 2 locations
+- [ ] **Fix 4:** Location normalization - Add `capitalizeWords`, normalize when saving and displaying
+- [ ] **Fix 5:** getClosureDisplayLocation exact match - Try exact match first, then partial, always capitalize
+- [ ] **Fix 6:** Remove Past closures section - Delete the View block showing past closures list
+- [ ] **Fix 7:** Make past dates selectable - Remove `isPast` restriction for timeoff type
+- [ ] **Fix 8:** Selected dates banner - Add banner showing "X days — dates" after calendar
+
+**Reference Files:**
+- Web calendar logic: `client/src/pages/add-details.tsx` lines 655-750 (Cleaning calendar), 1110-1167 (Time Off calendar)
+- Web location normalization: `client/src/pages/add-details.tsx` lines 177-201, 854, 899-930
+- Calendar Problems doc: `docs/Calendar Problems and Fixes.md` (February 3, 2026 section)
+
+---
+
 ## 0b. Documented fixes (Jan 14, Dec 19, Dec 23) – applied to mobile?
 
 Checked **Problems and Fixes.md**, **Project Architecture.md** (Last Updated **January 14, 2026**), and **Dec 19 / Dec 23** entries. For each documented fix, whether it was applied to mobile is below.
