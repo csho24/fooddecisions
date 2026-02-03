@@ -5,7 +5,6 @@ import { Utensils, List, Plus, ChefHat, Store, AlertCircle } from "lucide-react"
 import bgPattern from "@assets/generated_images/subtle_abstract_food_pattern_background.png";
 import { useEffect, useMemo, useState } from "react";
 import { getClosureSchedules, ClosureSchedule } from "@/lib/api";
-import { capitalizeWords } from "@/lib/utils";
 
 const container = {
   hidden: { opacity: 0 },
@@ -43,19 +42,13 @@ export default function Home() {
 
   const closureBannerGroups = useMemo(() => {
     if (todaysClosures.length === 0) return [];
-    // Normalize locations to prevent duplicates like "Margaret Drive" vs "Margaret drive"
-    const normalizeLocKey = (s: string) => s.trim().toLowerCase();
-    const byLocation = new Map<string, { location: string; closures: ClosureSchedule[] }>();
+    const byLocation = new Map<string, ClosureSchedule[]>();
     for (const c of todaysClosures) {
-      const rawLoc = c.location || c.foodItemName || 'Unknown';
-      const normalizedKey = normalizeLocKey(rawLoc);
-      const capitalizedLoc = capitalizeWords(rawLoc);
-      if (!byLocation.has(normalizedKey)) {
-        byLocation.set(normalizedKey, { location: capitalizedLoc, closures: [] });
-      }
-      byLocation.get(normalizedKey)!.closures.push(c);
+      const loc = c.location || c.foodItemName || 'Unknown';
+      if (!byLocation.has(loc)) byLocation.set(loc, []);
+      byLocation.get(loc)!.push(c);
     }
-    return Array.from(byLocation.values()).map(({ location, closures }) => ({
+    return Array.from(byLocation.entries()).map(([location, closures]) => ({
       location,
       isCleaning: closures.some(c => c.type === 'cleaning')
     }));
@@ -85,16 +78,16 @@ export default function Home() {
           {closureBannerGroups.length > 0 && (
             <motion.div 
               variants={item}
-              className="bg-muted/50 border-2 border-border rounded-2xl p-5 flex items-start gap-4"
+              className="bg-muted/50 border border-border rounded-2xl p-4 flex items-start gap-3"
             >
-              <div className="bg-amber-100 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                <AlertCircle size={20} className="text-amber-600" />
+              <div className="bg-amber-100 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <AlertCircle size={18} className="text-amber-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-foreground text-base mb-2">Closed Today</p>
-                <div className="space-y-1.5">
+                <p className="font-semibold text-foreground text-sm mb-1">Closed Today</p>
+                <div className="space-y-1">
                   {closureBannerGroups.map((g, i) => (
-                    <p key={i} className={g.isCleaning ? "text-blue-700 text-base font-medium" : "text-amber-700 text-base font-medium"}>
+                    <p key={i} className={g.isCleaning ? "text-blue-700 text-sm" : "text-amber-700 text-sm"}>
                       {new Date().getDate()} {g.location} Stalls closed today
                     </p>
                   ))}

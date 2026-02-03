@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFoodStore } from '../store';
 import { FoodItem, FoodType, LocationDetail } from '../types';
 import { getClosureSchedules, createClosureSchedules, deleteClosureSchedule, ClosureSchedule } from '../api';
+import { capitalizeWords, normalizeLocKey } from '../../../shared/utils';
+import { categorizeFood, getClosureDisplayLocation as getClosureDisplayLocationShared } from '../../../shared/business-logic';
 
 interface AddInfoScreenProps {
   navigation: any;
@@ -120,16 +122,7 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
 
   // Resolve display location: use full location name from food item when available
   const getClosureDisplayLocation = (c: ClosureSchedule): string => {
-    if (c.foodItemId && items.length > 0) {
-      const item = items.find((i: FoodItem) => i.id === c.foodItemId);
-      if (item?.locations?.length) {
-        const match = item.locations.find((loc: LocationDetail) =>
-          (c.location && loc.name.toLowerCase().includes(c.location.toLowerCase()))
-        );
-        return (match ?? item.locations[0]).name;
-      }
-    }
-    return c.location ?? '';
+    return getClosureDisplayLocationShared(c, items);
   };
 
   const handleDeleteClosure = async (id: number) => {
@@ -217,22 +210,7 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
   };
 
   // Auto-categorize food (same as web)
-  const categorizeFood = (foodName: string): string => {
-    const lower = foodName.toLowerCase();
-    if (lower.includes('noodle') || lower.includes('mee') || lower.includes('laksa') || lower.includes('pasta')) {
-      return 'Noodles';
-    }
-    if (lower.includes('rice') || lower.includes('nasi') || lower.includes('biryani')) {
-      return 'Rice';
-    }
-    if (lower.includes('burger') || lower.includes('pizza') || lower.includes('steak') || lower.includes('fries')) {
-      return 'Western';
-    }
-    if (lower.includes('salad') || lower.includes('soup') || lower.includes('sandwich')) {
-      return 'Light';
-    }
-    return 'Ethnic';
-  };
+  // categorizeFood is now imported from shared/business-logic
 
   // ============================================================
   // IF itemId exists - Show Item Details (clicked from Food List)

@@ -12,7 +12,8 @@ import { useLocation, useSearch } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { cn, capitalizeWords } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { capitalizeWords, normalizeLocKey } from "../../../shared/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect, useRef } from "react";
 import { useSavedLocations } from "@/hooks/use-saved-locations";
@@ -20,7 +21,7 @@ import { Search, ChevronDown, Home, Utensils, Clock, Plus, MapPin, X, Trash2, Ca
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { createClosureSchedules, getClosureSchedules, deleteClosureSchedule, ClosureSchedule } from "@/lib/api";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { categorizeFood } from "@/lib/food-categories";
+import { categorizeFood, getClosureDisplayLocation as getClosureDisplayLocationShared } from "../../../shared/business-logic";
 import {
   Dialog,
   DialogContent,
@@ -89,9 +90,11 @@ export default function AddPage() {
   const [cleaningLocation, setCleaningLocation] = useState("");
   const [selectedClosureFoodItem, setSelectedClosureFoodItem] = useState<FoodItem | null>(null);
   const [savedClosures, setSavedClosures] = useState<ClosureSchedule[]>([]);
-  const [selectingSpecificStalls, setSelectingSpecificStalls] = useState(false);
-  const [selectedStallsForCleaning, setSelectedStallsForCleaning] = useState<Set<string>>(new Set());
 
+  // Debug: confirms which bundle is running. Open DevTools Console on /add — if you see this, new code is loaded.
+  useEffect(() => {
+    console.log('%c[ADD PAGE] Current bundle loaded (instruction under Cleaning Days location removed)', 'color: green; font-weight: bold');
+  }, []);
 
   // Fetch saved closures when entering closure screens
   useEffect(() => {
@@ -121,48 +124,13 @@ export default function AddPage() {
     return savedClosures.some(c => c.type === type && c.date === dateStr);
   };
 
-  // Get closure info for a date (for tooltip) — first match
+  // Get closure info for a date (for tooltip)
   const getClosureForDate = (date: Date): ClosureSchedule | undefined => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     return savedClosures.find(c => c.date === dateStr);
-  };
-
-  // Number of cleaning closures on a date (multiple = multiple locations that day)
-  const getCleaningCountForDate = (date: Date): number => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
-    return savedClosures.filter(c => c.type === 'cleaning' && c.date === dateStr).length;
-  };
-
-  // Number of DISTINCT cleaning locations on a date.
-  // IMPORTANT: We save one "cleaning" row per stall, so raw counts can be high even for ONE location.
-  // Dark blue should only happen when 2+ different locations share the same cleaning date.
-  const getCleaningLocationCountForDate = (date: Date): number => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
-    const locKeys = new Set(
-      savedClosures
-        .filter(c => c.type === 'cleaning' && c.date === dateStr)
-        .map(c => normalizeLocKey(getClosureDisplayLocation(c))),
-    );
-    locKeys.delete('');
-    return locKeys.size;
-  };
-
-  // All cleaning closures for a date (for tooltip when multiple locations)
-  const getCleaningClosuresForDate = (date: Date): ClosureSchedule[] => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
-    return savedClosures.filter(c => c.type === 'cleaning' && c.date === dateStr);
   };
 
   // Only show future/current closures in the "Scheduled Closures" list (past ones stay on calendar)
@@ -175,30 +143,7 @@ export default function AddPage() {
 
   // Resolve display location: use full location name from food item when available
   const getClosureDisplayLocation = (c: ClosureSchedule): string => {
-    if (c.foodItemId && items.length > 0) {
-      const item = items.find(i => i.id === c.foodItemId);
-      if (item?.locations?.length) {
-        // Prefer exact match first (case-insensitive), then partial match, else first location
-        const savedLoc = (c.location ?? '').trim().toLowerCase();
-        if (savedLoc) {
-          // Try exact match first
-          const exactMatch = item.locations.find(loc =>
-            loc.name.trim().toLowerCase() === savedLoc
-          );
-          if (exactMatch) return capitalizeWords(exactMatch.name); // Ensure consistent capitalization
-          
-          // Fallback to partial match (for legacy data or abbreviations)
-          const partialMatch = item.locations.find(loc =>
-            loc.name.toLowerCase().includes(savedLoc) || savedLoc.includes(loc.name.toLowerCase())
-          );
-          if (partialMatch) return capitalizeWords(partialMatch.name); // Ensure consistent capitalization
-        }
-        // If no match, return first location (shouldn't happen if saved correctly)
-        return capitalizeWords(item.locations[0].name); // Ensure consistent capitalization
-      }
-    }
-    // Always capitalize the stored location to normalize existing data
-    return c.location ? capitalizeWords(c.location) : '';
+    return getClosureDisplayLocationShared(c, items);
   };
 
   // Tooltip text for a closure (e.g. "Ghim Moh › Duck Rice • Time off")
@@ -210,7 +155,6 @@ export default function AddPage() {
 
   // Group cleaning by (location, date range); consecutive dates become "16–17 Mar"
   type CleaningGroup = { dateRange: string; displayLoc: string; ids: number[] };
-  const normalizeLocKey = (s: string) => s.trim().toLowerCase();
   const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const formatDateRange = (start: string, end: string): string => {
     const [, m1, d1] = start.split('-').map(Number);
@@ -294,9 +238,7 @@ export default function AddPage() {
       for (const id of ids) await deleteClosureSchedule(id);
       const updated = await getClosureSchedules();
       setSavedClosures(updated);
-      // Show clearer message - if it's a group (multiple dates/locations), say "group", otherwise "closure"
-      const isGroup = ids.length > 1;
-      toast({ title: "Deleted", description: isGroup ? `Cleaning schedule group removed (${ids.length} entries).` : "Cleaning schedule removed." });
+      toast({ title: "Deleted", description: ids.length > 1 ? `${ids.length} closures removed.` : "Closure removed." });
     } catch (err) {
       console.error('Failed to delete closure:', err);
       toast({ title: "Error", description: "Failed to delete closure.", variant: "destructive" });
@@ -456,11 +398,10 @@ export default function AddPage() {
     if (!selectedItem) return;
 
     const capitalizedLocationName = capitalizeWords(values.name);
-    const normalizedName = normalizeLocKey(capitalizedLocationName);
 
     const newLocation: LocationDetail = {
       id: values.id || Math.random().toString(36).substr(2, 9),
-      name: capitalizedLocationName, // Always store with consistent capitalization
+      name: capitalizedLocationName,
       notes: values.notes,
       openingHours: isHoursOpen && values.openTime && values.closeTime ? {
         open: values.openTime,
@@ -470,29 +411,14 @@ export default function AddPage() {
     };
 
     let updatedLocations = selectedItem.locations || [];
-    let toastMessage = "";
     
     if (editingLocation) {
-      // When editing, replace the location being edited
       updatedLocations = updatedLocations.map(l => l.id === editingLocation.id ? newLocation : l);
-      toastMessage = `Location "${capitalizedLocationName}" updated.`;
     } else {
-      // When adding new location, check if a location with the same normalized name already exists
-      const existingIndex = updatedLocations.findIndex(l => normalizeLocKey(l.name) === normalizedName);
-      if (existingIndex >= 0) {
-        // Update existing location instead of creating duplicate
-        updatedLocations = updatedLocations.map((l, idx) => 
-          idx === existingIndex ? { ...newLocation, id: l.id } : l
-        );
-        toastMessage = `Updated existing location "${capitalizedLocationName}" (prevented duplicate).`;
-      } else {
-        // Add new location
-        updatedLocations = [...updatedLocations, newLocation];
-        toastMessage = `Location "${capitalizedLocationName}" added.`;
-      }
+      updatedLocations = [...updatedLocations, newLocation];
     }
 
-    // Save to saved locations list for quick access (normalized to prevent duplicates)
+    // Save to saved locations list for quick access
     saveLocationToHistory(capitalizedLocationName);
 
     updateItem(selectedItem.id, { locations: updatedLocations });
@@ -501,7 +427,7 @@ export default function AddPage() {
     setSelectedItem({ ...selectedItem, locations: updatedLocations });
     
     setIsLocationDialogOpen(false);
-    toast({ title: "Location Saved", description: toastMessage });
+    toast({ title: "Location Saved", description: `${capitalizedLocationName} updated.` });
   }
 
   function deleteLocation(id: string) {
@@ -675,21 +601,21 @@ export default function AddPage() {
               <h3 className="font-bold text-lg">Cleaning Days</h3>
               <Calendar
                 mode="multiple"
-                selected={selectedCleaningDates}
+                selected={[...getSavedDatesForType('cleaning'), ...selectedCleaningDates]}
                 onSelect={(dates) => {
                   if (!dates) {
                     setSelectedCleaningDates([]);
                     return;
                   }
-                  // dates contains ALL currently selected dates from the calendar
-                  // Filter out timeoff dates, then use directly as selectedCleaningDates
-                  const allSelected = dates.filter(d => !isDateSaved(d, 'timeoff'));
-                  const uniqueDates = Array.from(new Map(allSelected.map(d => [d.getTime(), d])).values());
-                  setSelectedCleaningDates(uniqueDates);
+                  // Filter out saved dates (both types) - only keep newly selected ones
+                  const newDates = dates.filter(d => 
+                    !isDateSaved(d, 'cleaning') && !isDateSaved(d, 'timeoff')
+                  );
+                  setSelectedCleaningDates(newDates);
                 }}
                 disabled={(date) => isDateSaved(date, 'timeoff')}
                 modifiers={{
-                  cleaning: Array.from(new Set([...getSavedDatesForType('cleaning'), ...selectedCleaningDates].map(d => d.getTime()))).map(t => new Date(t)),
+                  cleaning: [...getSavedDatesForType('cleaning'), ...selectedCleaningDates],
                   timeoff: getSavedDatesForType('timeoff')
                 }}
                 modifiersStyles={{
@@ -710,46 +636,19 @@ export default function AddPage() {
                 }}
                 components={{
                   DayButton: (props) => {
-                    const date = props.day.date;
+                    const closure = getClosureForDate(props.day.date);
+                    const title = closure ? getClosureTooltip(closure) : undefined;
                     const isCleaning = (props as { modifiers?: { cleaning?: boolean; timeoff?: boolean } }).modifiers?.cleaning;
                     const isTimeoff = (props as { modifiers?: { cleaning?: boolean; timeoff?: boolean } }).modifiers?.timeoff;
-                    const cleaningCount = getCleaningCountForDate(date);
-                    const cleaningLocCount = getCleaningLocationCountForDate(date);
-                    const cleaningClosures = getCleaningClosuresForDate(date);
-                    const closure = getClosureForDate(date);
-                    // Dark blue ONLY when 2+ distinct locations share this date
-                    const shouldBeDarkBlue = isCleaning && cleaningLocCount >= 2;
-                    const title = isTimeoff
-                      ? (closure ? getClosureTooltip(closure) : undefined)
-                      : (cleaningCount > 0
-                        ? (cleaningCount > 1
-                          ? Array.from(new Set(cleaningClosures.map(c => normalizeLocKey(getClosureDisplayLocation(c))))).map(locKey => {
-                              // Find the first closure with this normalized location to get the properly capitalized version
-                              const firstMatch = cleaningClosures.find(c => normalizeLocKey(getClosureDisplayLocation(c)) === locKey);
-                              return firstMatch ? capitalizeWords(getClosureDisplayLocation(firstMatch)) : locKey;
-                            }).join(', ') + ' • Cleaning'
-                          : closure ? getClosureTooltip(closure) : undefined)
-                        : undefined);
-                    const isAlreadySaved = isDateSaved(date, 'cleaning');
-                    const isInSelected = selectedCleaningDates.some(d => d.getTime() === date.getTime());
                     return (
                       <CalendarDayButton
                         {...props}
                         title={title}
-                        onClick={(e) => {
-                          // If date is already saved but not in selectedCleaningDates, add it so user can add another location
-                          if (isAlreadySaved && !isInSelected && !isDateSaved(date, 'timeoff')) {
-                            setSelectedCleaningDates([...selectedCleaningDates, date]);
-                          }
-                          // Call original onClick if it exists
-                          if (props.onClick) props.onClick(e);
-                        }}
                         className={cn(
                           props.className,
                           "!rounded-xl",
-                          isCleaning && (shouldBeDarkBlue ? "!bg-[#1e40af] !text-white" : "!bg-[#2563eb] !text-white"),
-                          isTimeoff && "!bg-[#f59e0b] !text-white",
-                          isInSelected && "!ring-2 !ring-orange-500 !ring-offset-2"
+                          isCleaning && "!bg-[#2563eb] !text-white",
+                          isTimeoff && "!bg-[#f59e0b] !text-white"
                         )}
                       />
                     );
@@ -796,14 +695,49 @@ export default function AddPage() {
                   </div>
                 </div>
               )}
+              {pastClosuresList.length > 0 && (
+                <Collapsible className="bg-muted/20 rounded-xl p-3">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground">
+                    Past closures
+                    <ChevronDown className="h-4 w-4 shrink-0" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="max-h-[220px] overflow-y-scroll overflow-x-hidden rounded-md border border-transparent pr-1" style={{ scrollbarGutter: 'stable' }}>
+                      <div className="space-y-1.5 pr-1">
+                    {pastClosuresList.map((entry) => {
+                      if ('ids' in entry && entry.ids) {
+                        const g = entry as CleaningGroup;
+                        return (
+                          <div key={`past-cleaning-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
+                            <span className="min-w-0 flex-1">{g.displayLoc}</span>
+                            <span className="opacity-70 shrink-0">{g.dateRange}</span>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      }
+                      const c = entry as ClosureSchedule;
+                      const displayLoc = getClosureDisplayLocation(c);
+                      return (
+                        <div key={c.id} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
+                          <span className="min-w-0 flex-1">
+                            {displayLoc && c.foodItemName ? `${displayLoc} › ${c.foodItemName}` : c.foodItemName || displayLoc}
+                          </span>
+                          <span className="opacity-70 shrink-0">{c.date.split('-')[2]}/{c.date.split('-')[1]}</span>
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosure(c.id)} aria-label="Delete closure">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
               {selectedCleaningDates.length > 0 && (
                 <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground px-3">
-                    {selectedCleaningDates.length} day{selectedCleaningDates.length !== 1 ? 's' : ''} — {selectedCleaningDates.sort((a, b) => a.getTime() - b.getTime()).map(d => {
-                      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                      return `${d.getDate()} ${months[d.getMonth()]}`;
-                    }).join(', ')}
-                  </p>
                   <div className="space-y-2 px-1">
                     <Label>Location (hawker centre / area)</Label>
                     <div className="min-w-0 overflow-visible">
@@ -813,11 +747,6 @@ export default function AddPage() {
                         value={cleaningLocation}
                         onChange={(e) => {
                           setCleaningLocation(e.target.value);
-                          // Reset selection mode when location changes
-                          if (selectingSpecificStalls) {
-                            setSelectingSpecificStalls(false);
-                            setSelectedStallsForCleaning(new Set());
-                          }
                         }}
                         onBlur={(e) => {
                           const capitalized = capitalizeWords(e.target.value);
@@ -831,9 +760,7 @@ export default function AddPage() {
                           for (const item of items.filter(i => i.type === 'out')) {
                             for (const loc of item.locations ?? []) {
                               const n = normalizeLocKey(loc.name);
-                              // Always use capitalized version to ensure consistency
-                              const capitalized = capitalizeWords(loc.name);
-                              if (!byNorm.has(n)) byNorm.set(n, capitalized);
+                              if (!byNorm.has(n)) byNorm.set(n, loc.name);
                             }
                           }
                           return Array.from(byNorm.values()).sort((a, b) => a.localeCompare(b)).map(name => (
@@ -869,223 +796,68 @@ export default function AddPage() {
                         (item.locations ?? []).filter(loc => loc.name.trim().toLowerCase() === cleaned).map(loc => loc.name)
                       )
                     ));
-                    // Always capitalize consistently to avoid duplicates like "Margaret Drive" vs "Margaret drive"
-                    const fullLocation = capitalizeWords(matchedLocationNames[0] ?? cleaningLocation.trim());
-
-                    const itemsToSave = selectingSpecificStalls 
-                      ? matchingItems.filter(item => selectedStallsForCleaning.has(item.id))
-                      : matchingItems;
-
-                    console.log('[CLEANING DEBUG]', {
-                      matchingItemsLength: matchingItems.length,
-                      selectingSpecificStalls,
-                      fullLocation,
-                      hasMatchingItems: matchingItems.length > 0
-                    });
+                    const fullLocation = matchedLocationNames[0] ?? cleaningLocation.trim();
 
                     return (
                       <div className="space-y-4">
                         <p className="text-xs font-medium text-muted-foreground rounded-lg bg-muted/40 px-3 py-2">
                           {matchingItems.length} stall{matchingItems.length !== 1 ? 's' : ''} identified for {fullLocation}
                         </p>
-                        {!selectingSpecificStalls ? (
-                          <>
-                            <Button 
-                              onClick={async () => {
-                                try {
-                                  const locKey = normalizeLocKey(fullLocation);
-                                  const existingDates = new Set(
-                                    savedClosures
-                                      .filter(c => c.type === 'cleaning' && normalizeLocKey(getClosureDisplayLocation(c)) === locKey)
-                                      .map(c => c.date)
-                                  );
-                                  const newDates = selectedCleaningDates.filter(d => {
-                                    const year = d.getFullYear();
-                                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                                    const day = String(d.getDate()).padStart(2, '0');
-                                    return !existingDates.has(`${year}-${month}-${day}`);
+                        <Button 
+                          onClick={async () => {
+                            try {
+                              const locKey = normalizeLocKey(fullLocation);
+                              const existingDates = new Set(
+                                savedClosures
+                                  .filter(c => c.type === 'cleaning' && normalizeLocKey(getClosureDisplayLocation(c)) === locKey)
+                                  .map(c => c.date)
+                              );
+                              const newDates = selectedCleaningDates.filter(d => {
+                                const year = d.getFullYear();
+                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                const day = String(d.getDate()).padStart(2, '0');
+                                return !existingDates.has(`${year}-${month}-${day}`);
+                              });
+                              if (newDates.length === 0) {
+                                const existingStr = Array.from(existingDates).sort().map(d => {
+                                  const [y, m, day] = d.split('-');
+                                  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                  return `${parseInt(day, 10)} ${months[parseInt(m, 10) - 1]}`;
+                                }).join(', ');
+                                toast({ title: "Already entered", description: `Cleaning schedule on ${existingStr} already entered for ${fullLocation}.`, variant: "default" });
+                                return;
+                              }
+                              const schedules: Array<{ type: 'cleaning'; date: string; location: string; foodItemId?: string; foodItemName?: string }> = [];
+                              for (const date of newDates) {
+                                const year = date.getFullYear();
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const day = String(date.getDate()).padStart(2, '0');
+                                const dateStr = `${year}-${month}-${day}`;
+                                for (const item of matchingItems) {
+                                  schedules.push({
+                                    type: 'cleaning',
+                                    date: dateStr,
+                                    location: fullLocation,
+                                    foodItemId: item.id,
+                                    foodItemName: item.name
                                   });
-                                  if (newDates.length === 0) {
-                                    const existingStr = Array.from(existingDates).sort().map(d => {
-                                      const [y, m, day] = d.split('-');
-                                      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                                      return `${parseInt(day, 10)} ${months[parseInt(m, 10) - 1]}`;
-                                    }).join(', ');
-                                    toast({ title: "Already entered", description: `Cleaning schedule on ${existingStr} already entered for ${fullLocation}.`, variant: "default" });
-                                    return;
-                                  }
-                                  const schedules: Array<{ type: 'cleaning'; date: string; location: string; foodItemId?: string; foodItemName?: string }> = [];
-                                  for (const date of newDates) {
-                                    const year = date.getFullYear();
-                                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                                    const day = String(date.getDate()).padStart(2, '0');
-                                    const dateStr = `${year}-${month}-${day}`;
-                                    for (const item of itemsToSave) {
-                                      schedules.push({
-                                        type: 'cleaning',
-                                        date: dateStr,
-                                        location: capitalizeWords(fullLocation), // Ensure consistent capitalization
-                                        foodItemId: item.id,
-                                        foodItemName: item.name
-                                      });
-                                    }
-                                  }
-                                  await createClosureSchedules(schedules);
-                                  const updated = await getClosureSchedules();
-                                  setSavedClosures(updated);
-                                  const dateStr = newDates.length === 1 
-                                    ? (() => {
-                                        const d = newDates[0];
-                                        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                                        return `${d.getDate()} ${months[d.getMonth()]}`;
-                                      })()
-                                    : (() => {
-                                        const sorted = [...newDates].sort((a, b) => a.getTime() - b.getTime());
-                                        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                                        return `${sorted[0].getDate()}–${sorted[sorted.length - 1].getDate()} ${months[sorted[0].getMonth()]}`;
-                                      })();
-                                  toast({ title: "Saved!", description: `${fullLocation} — ${itemsToSave.length} stall${itemsToSave.length !== 1 ? 's' : ''} closed for cleaning on ${dateStr}.` });
-                                  setSelectedCleaningDates([]);
-                                  setCleaningLocation("");
-                                  setSelectingSpecificStalls(false);
-                                  setSelectedStallsForCleaning(new Set());
-                                } catch (error) {
-                                  console.error('Error saving cleaning schedule:', error);
-                                  toast({ title: "Error", description: "Failed to save cleaning schedule.", variant: "destructive" });
                                 }
-                              }}
-                              className="w-full h-14 text-lg rounded-xl"
-                            >
-                              Mark all {matchingItems.length} stalls closed
-                            </Button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectingSpecificStalls(true);
-                                setSelectedStallsForCleaning(new Set(matchingItems.map(item => item.id)));
-                              }}
-                              className="w-full text-sm text-muted-foreground hover:text-foreground underline text-center py-2 bg-transparent border-none cursor-pointer"
-                            >
-                              Select specific stalls
-                            </button>
-                          </>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium">Select stalls to mark closed:</Label>
-                              <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-lg p-3">
-                                {matchingItems.map(item => (
-                                  <div key={item.id} className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`stall-${item.id}`}
-                                      checked={selectedStallsForCleaning.has(item.id)}
-                                      onCheckedChange={(checked) => {
-                                        const newSet = new Set(selectedStallsForCleaning);
-                                        if (checked) {
-                                          newSet.add(item.id);
-                                        } else {
-                                          newSet.delete(item.id);
-                                        }
-                                        setSelectedStallsForCleaning(newSet);
-                                      }}
-                                    />
-                                    <label
-                                      htmlFor={`stall-${item.id}`}
-                                      className="text-sm cursor-pointer flex-1"
-                                    >
-                                      {item.name}
-                                    </label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                onClick={() => {
-                                  setSelectingSpecificStalls(false);
-                                  setSelectedStallsForCleaning(new Set());
-                                }}
-                                variant="outline"
-                                className="flex-1"
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                onClick={async () => {
-                                  if (selectedStallsForCleaning.size === 0) {
-                                    toast({ title: "No stalls selected", description: "Please select at least one stall.", variant: "default" });
-                                    return;
-                                  }
-                                  try {
-                                    const locKey = normalizeLocKey(fullLocation);
-                                    const existingDates = new Set(
-                                      savedClosures
-                                        .filter(c => c.type === 'cleaning' && normalizeLocKey(getClosureDisplayLocation(c)) === locKey)
-                                        .map(c => c.date)
-                                    );
-                                    const newDates = selectedCleaningDates.filter(d => {
-                                      const year = d.getFullYear();
-                                      const month = String(d.getMonth() + 1).padStart(2, '0');
-                                      const day = String(d.getDate()).padStart(2, '0');
-                                      return !existingDates.has(`${year}-${month}-${day}`);
-                                    });
-                                    if (newDates.length === 0) {
-                                      const existingStr = Array.from(existingDates).sort().map(d => {
-                                        const [y, m, day] = d.split('-');
-                                        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                                        return `${parseInt(day, 10)} ${months[parseInt(m, 10) - 1]}`;
-                                      }).join(', ');
-                                      toast({ title: "Already entered", description: `Cleaning schedule on ${existingStr} already entered for ${fullLocation}.`, variant: "default" });
-                                      return;
-                                    }
-                                    const schedules: Array<{ type: 'cleaning'; date: string; location: string; foodItemId?: string; foodItemName?: string }> = [];
-                                    for (const date of newDates) {
-                                      const year = date.getFullYear();
-                                      const month = String(date.getMonth() + 1).padStart(2, '0');
-                                      const day = String(date.getDate()).padStart(2, '0');
-                                      const dateStr = `${year}-${month}-${day}`;
-                                      for (const item of itemsToSave) {
-                                        schedules.push({
-                                          type: 'cleaning',
-                                          date: dateStr,
-                                          location: capitalizeWords(fullLocation), // Ensure consistent capitalization
-                                          foodItemId: item.id,
-                                          foodItemName: item.name
-                                        });
-                                      }
-                                    }
-                                    await createClosureSchedules(schedules);
-                                    const updated = await getClosureSchedules();
-                                    setSavedClosures(updated);
-                                    const dateStr = newDates.length === 1 
-                                      ? (() => {
-                                          const d = newDates[0];
-                                          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                                          return `${d.getDate()} ${months[d.getMonth()]}`;
-                                        })()
-                                      : (() => {
-                                          const sorted = [...newDates].sort((a, b) => a.getTime() - b.getTime());
-                                          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                                          return `${sorted[0].getDate()}–${sorted[sorted.length - 1].getDate()} ${months[sorted[0].getMonth()]}`;
-                                        })();
-                                    toast({ title: "Saved!", description: `${fullLocation} — ${itemsToSave.length} stall${itemsToSave.length !== 1 ? 's' : ''} closed for cleaning on ${dateStr}.` });
-                                    setSelectedCleaningDates([]);
-                                    setCleaningLocation("");
-                                    setSelectingSpecificStalls(false);
-                                    setSelectedStallsForCleaning(new Set());
-                                  } catch (error) {
-                                    console.error('Error saving cleaning schedule:', error);
-                                    toast({ title: "Error", description: "Failed to save cleaning schedule.", variant: "destructive" });
-                                  }
-                                }}
-                                className="flex-1"
-                                disabled={selectedStallsForCleaning.size === 0}
-                              >
-                                Save ({selectedStallsForCleaning.size} selected)
-                              </Button>
-                            </div>
-                          </div>
-                        )}
+                              }
+                              await createClosureSchedules(schedules);
+                              const updated = await getClosureSchedules();
+                              setSavedClosures(updated);
+                              toast({ title: "Saved!", description: `${fullLocation} — ${matchingItems.length} stall${matchingItems.length !== 1 ? 's' : ''} closed for cleaning.` });
+                              setSelectedCleaningDates([]);
+                              setCleaningLocation("");
+                            } catch (error) {
+                              console.error('Error saving cleaning schedule:', error);
+                              toast({ title: "Error", description: "Failed to save cleaning schedule.", variant: "destructive" });
+                            }
+                          }}
+                          className="w-full h-14 text-lg rounded-xl"
+                        >
+                          Mark all {matchingItems.length} stalls closed
+                        </Button>
                       </div>
                     );
                   })()}
@@ -1103,13 +875,13 @@ export default function AddPage() {
                     setSelectedTimeOffDates([]);
                     return;
                   }
-                  // Filter out saved dates (both types) - only keep newly selected ones
+                  // Filter out saved dates (both types) and past dates - only keep newly selected ones
                   const newDates = dates.filter(d => 
-                    !isDateSaved(d, 'timeoff') && !isDateSaved(d, 'cleaning')
+                    !isDateSaved(d, 'timeoff') && !isDateSaved(d, 'cleaning') && d >= today
                   );
                   setSelectedTimeOffDates(newDates);
                 }}
-                disabled={(date) => isDateSaved(date, 'cleaning')}
+                disabled={(date) => date < today || isDateSaved(date, 'cleaning')}
                 modifiers={{
                   cleaning: getSavedDatesForType('cleaning'),
                   timeoff: [...getSavedDatesForType('timeoff'), ...selectedTimeOffDates]
@@ -1132,9 +904,7 @@ export default function AddPage() {
                 }}
                 components={{
                   DayButton: (props) => {
-                    const date = props.day.date;
-                    const closure = getClosureForDate(date);
-                    // Show tooltip for all dates (past and future) if there's a closure
+                    const closure = getClosureForDate(props.day.date);
                     const title = closure ? getClosureTooltip(closure) : undefined;
                     const isCleaning = (props as { modifiers?: { cleaning?: boolean; timeoff?: boolean } }).modifiers?.cleaning;
                     const isTimeoff = (props as { modifiers?: { cleaning?: boolean; timeoff?: boolean } }).modifiers?.timeoff;
@@ -1192,6 +962,47 @@ export default function AddPage() {
                     </div>
                   </div>
                 </div>
+              )}
+              {pastClosuresList.length > 0 && (
+                <Collapsible className="bg-muted/20 rounded-xl p-3">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full text-xs font-medium text-muted-foreground hover:text-foreground">
+                    Past closures
+                    <ChevronDown className="h-4 w-4 shrink-0" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="max-h-[220px] overflow-y-scroll overflow-x-hidden rounded-md border border-transparent pr-1" style={{ scrollbarGutter: 'stable' }}>
+                      <div className="space-y-1.5 pr-1">
+                    {pastClosuresList.map((entry) => {
+                      if ('ids' in entry && entry.ids) {
+                        const g = entry as CleaningGroup;
+                        return (
+                          <div key={`past-to-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
+                            <span className="min-w-0 flex-1">{g.displayLoc}</span>
+                            <span className="opacity-70 shrink-0">{g.dateRange}</span>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      }
+                      const c = entry as ClosureSchedule;
+                      const displayLoc = getClosureDisplayLocation(c);
+                      return (
+                        <div key={c.id} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
+                          <span className="min-w-0 flex-1">
+                            {displayLoc && c.foodItemName ? `${displayLoc} › ${c.foodItemName}` : c.foodItemName || displayLoc}
+                          </span>
+                          <span className="opacity-70 shrink-0">{c.date.split('-')[2]}/{c.date.split('-')[1]}</span>
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosure(c.id)} aria-label="Delete closure">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
               {selectedTimeOffDates.length > 0 && (
                 <div className="space-y-4">
@@ -1257,12 +1068,9 @@ export default function AddPage() {
                     onClick={async () => {
                       try {
                         // Use full location name from selected food item (not search query e.g. "GH")
-                        // Always capitalize consistently to avoid duplicates
-                        const fullLocation = capitalizeWords(
-                          selectedClosureFoodItem?.locations?.find(loc =>
-                            loc.name.toLowerCase().includes(cleaningLocation.toLowerCase())
-                          )?.name ?? cleaningLocation.trim()
-                        );
+                        const fullLocation = selectedClosureFoodItem?.locations?.find(loc =>
+                          loc.name.toLowerCase().includes(cleaningLocation.toLowerCase())
+                        )?.name ?? cleaningLocation.trim();
                         const schedules = selectedTimeOffDates.map(date => {
                           // Format as local date (YYYY-MM-DD) to avoid timezone shift
                           const year = date.getFullYear();
@@ -1271,7 +1079,7 @@ export default function AddPage() {
                           return {
                             type: 'timeoff' as const,
                             date: `${year}-${month}-${day}`,
-                            location: capitalizeWords(fullLocation), // Ensure consistent capitalization
+                            location: fullLocation,
                             foodItemId: selectedClosureFoodItem?.id,
                             foodItemName: selectedClosureFoodItem?.name
                           };

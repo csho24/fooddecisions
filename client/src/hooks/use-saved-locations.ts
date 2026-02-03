@@ -18,19 +18,13 @@ export function useSavedLocations() {
   }, []);
 
   // Save a location (adds if not exists, moves to top)
-  // Always normalizes capitalization to prevent duplicates like "Margaret Drive" vs "Margaret drive"
   const saveLocation = useCallback((location: string) => {
     if (!location || location.trim().length < 2) return;
     
-    // Import capitalizeWords - but since we can't import here, we'll do basic normalization
-    // The actual capitalization should happen before calling this function
     const trimmed = location.trim();
-    const normalized = trimmed.toLowerCase();
-    
     setSavedLocations(prev => {
-      // Remove if exists (case-insensitive), then add to front with consistent capitalization
-      const filtered = prev.filter(loc => loc.toLowerCase() !== normalized);
-      // Use the provided location (should already be capitalized by caller)
+      // Remove if exists, then add to front
+      const filtered = prev.filter(loc => loc.toLowerCase() !== trimmed.toLowerCase());
       const updated = [trimmed, ...filtered];
       
       // Limit to 50 locations
