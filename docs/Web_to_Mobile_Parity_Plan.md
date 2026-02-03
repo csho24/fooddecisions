@@ -24,6 +24,13 @@ Everything we changed on web in this chat is listed below with **Applied to mobi
 | 8 | **Colors:** Cleaning = blue, time off = amber (list rows, calendar modifiers, home banner lines) | ⚠️ Partial | Add Info: ✅. **Home banner: ❌** – mobile still all amber; add blue for cleaning lines in `HomeScreen.tsx`. |
 | 9 | **Location input (closure):** Focus ring inset so edges don’t clip; `px-1` wrapper; label aligned with input | N/A (web only) | Low: if mobile location input feels misaligned, add matching horizontal padding. |
 | 10 | **Decide – hide header back:** When drilled into Go Out → Food (category) or Go Out → Location (location), hide header back; only “Back to Categories” / “Back to Locations” | ❌ No | Mobile Decide doesn’t have Location/Food drill yet; when you add it (section 2.3), also hide header back when drilled in. |
+| 11 | **Calendar multi-date selection:** Can select multiple dates (including saved dates) - orange border persists on all selected dates | ❌ No | **CRITICAL:** See section 0c below for detailed steps. |
+| 12 | **Calendar dark blue logic:** Dark blue only for 2+ distinct locations (not 2+ stalls) | ❌ No | **CRITICAL:** See section 0c below for detailed steps. |
+| 13 | **Location capitalization normalization:** Prevent duplicates like "Margaret Drive" vs "Margaret drive" | ❌ No | **CRITICAL:** See section 0c below for detailed steps. |
+| 14 | **Past closures removed:** Removed "Past closures" sections from UI (past dates still visible on calendar) | ⚠️ Partial | Mobile still has "Past closures" section - remove it to match web. |
+| 15 | **Past dates selectable in Time Off:** Past dates no longer disabled in Time Off calendar | ❌ No | Mobile still disables past dates () - remove this restriction. |
+| 16 | **Selected dates banner:** Shows "2 days — 9 Feb, 10 Feb" under calendar when dates selected | ❌ No | Add banner showing selected dates count and list. |
+| 17 | **getClosureDisplayLocation exact match:** Uses exact match (case-insensitive) instead of includes() to prevent wrong location display | ❌ No | **CRITICAL:** See section 0c below for detailed steps. |
 
 **Summary:** Items 1–3, 5–7 are done on mobile. Item 4 (tooltip) and 9 (input alignment) are optional/low. Item 8 – **Home closure banner colors** still needs to be done on mobile. Item 10 – **Decide** (tabs + drill + hide back) is the big parity piece not yet on mobile. **Items 11–17 are February 3, 2026 calendar fixes that need to be replicated on mobile.**
 
