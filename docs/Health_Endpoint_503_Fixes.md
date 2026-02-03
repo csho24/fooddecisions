@@ -407,6 +407,68 @@ app.get("/health", (req, res) => {
 
 **✅ Fully Resolved** - Server stays awake 24/7 with 10-minute cron intervals, providing instant load times with no cold starts.
 
+---
+
+## Update: January 21, 2026 - 10-Minute Interval Failure
+
+**Date:** January 21, 2026  
+**Issue:** Cron job failed and auto-disabled on 2nd day despite 10-minute intervals  
+**Status:** ⚠️ Partially Resolved
+
+### Problem Summary
+
+After the January 19-20 fix (10-minute intervals), the cron job worked perfectly for **1 day**, then failed again:
+- Cron worked successfully on January 20 ✅
+- On January 21, cron failed with "HTTP error (474 ms)" - immediate 503 response
+- Cron service auto-disabled itself after repeated failures
+- Server went to sleep, causing cold start delays when accessing the app
+
+### Root Cause Analysis
+
+Even with 10-minute intervals (which should prevent the 15-minute spin-down), the cron still failed. Possible causes:
+
+1. **Render timer reset delays** - Render may not reset the inactivity timer immediately when a request arrives, creating a small delay that accumulates over time
+2. **Clock desynchronization** - Cron service clock vs Render's internal clock may drift, causing timing misalignment
+3. **Request processing delays** - Render may count "activity" from when request completes, not when it arrives
+4. **Accumulated timing drift** - Small delays (1-2 seconds) can accumulate over multiple hits, eventually creating a gap longer than 15 minutes
+
+**The fundamental issue:** Even with 10-minute intervals, if there's ANY delay or clock offset in how Render processes/resets the timer, you can still accidentally hit the 15-minute threshold.
+
+### Fix 6: Reduced Interval to 5 Minutes
+
+**Date:** February 3, 2026
+
+**Change:** Reduced cron interval from 10 minutes → **5 minutes**
+
+**Why this works better:**
+- 5 minutes provides a much larger safety buffer (10 minutes before spin-down threshold)
+- Even with 2-3 second delays or clock drift, you still have multiple hits before the 15-minute threshold
+- Much harder to accidentally create a 15+ minute gap
+- More aggressive approach ensures server stays awake
+
+**Updated Cron Job Configuration:**
+- **Frequency:** Every **5 minutes** (changed from 10)
+- **Endpoint:** `https://fooddecisions.onrender.com/health`
+- **Method:** GET
+- **Expected Response:** 200 OK with diagnostic JSON
+
+### Current Status - February 3, 2026
+
+**Testing in progress:**
+- Cron re-enabled on February 3, 2026 at ~9:33 AM
+- Interval set to 5 minutes
+- Monitoring to see if 5-minute interval prevents failures long-term
+
+**Key Insight:**
+The 10-minute interval logic was mathematically correct, but in practice, even small timing issues (delays, clock drift, processing time) can cause failures. The 5-minute interval provides a much larger safety margin to account for these real-world timing variations.
+
+### Lessons Learned
+
+1. **Theoretical math ≠ real-world behavior:** 10 minutes < 15 minutes should work, but timing delays/offsets can still cause failures
+2. **Build in larger safety margins:** 5-minute intervals provide 10 minutes of buffer before spin-down threshold
+3. **Cron auto-disable is too aggressive:** Even temporary issues cause the cron to disable itself, leaving no protection
+4. **Free tier limitations:** Render's free tier has timing quirks that require more aggressive intervals than mathematically necessary
+
 
 
 
