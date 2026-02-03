@@ -5,8 +5,9 @@
 **Current State:**
 - ✅ Shared: `shared/schema.ts` (database schema)
 - ✅ Shared: API endpoints (same backend)
-- ❌ Duplicated: Business logic (date formatting, location normalization, etc.)
-- ❌ Duplicated: UI components (React vs React Native)
+- ✅ **Shared: Business logic utilities** (`shared/utils.ts` - capitalizeWords, normalizeLocKey)
+- ✅ **Shared: Business logic functions** (`shared/business-logic.ts` - categorizeFood, getClosureDisplayLocation)
+- ❌ Duplicated: UI components (React vs React Native) - *This is expected and cannot be shared*
 
 ---
 
@@ -140,35 +141,53 @@ shared/
 
 ---
 
-## Immediate Action Items
+## Completed Actions ✅
 
-### 1. Extract Shared Utilities
+### ✅ 1. Extract Shared Utilities (Feb 3, 2026)
+**Files Created:**
+- `shared/utils.ts` - capitalizeWords, normalizeLocKey
+- `shared/business-logic.ts` - categorizeFood, getClosureDisplayLocation
+
+**Files Updated:**
+- `client/src/pages/add-details.tsx` - uses shared functions
+- `client/src/pages/list.tsx` - uses shared capitalizeWords
+- `client/src/pages/decide.tsx` - uses shared categorizeFood
+- `mobile/src/screens/AddInfoScreen.tsx` - uses all shared functions
+
+**Result:** ~200 lines of duplicated code removed. Bug fixes now apply to both platforms automatically.
+
+---
+
+## Remaining Action Items
+
+### ❌ 1. Extract Constants (TODO) ✅ **DONE (Feb 3, 2026)**
 ```typescript
-// shared/utils.ts
+// shared/utils.ts ✅ CREATED
 export function capitalizeWords(str: string): string { ... }
 export function normalizeLocKey(str: string): string { ... }
-export function formatDate(date: Date): string { ... }
 ```
+**Status:** ✅ Both web and mobile now import from `shared/utils.ts`
 
-### 2. Extract Business Logic
+### 2. Extract Business Logic ✅ **DONE (Feb 3, 2026)**
 ```typescript
-// shared/business-logic.ts
-export function categorizeFood(name: string): string { ... }
-export function getClosureDisplayLocation(...): string { ... }
-export function getCleaningLocationCountForDate(...): number { ... }
+// shared/business-logic.ts ✅ CREATED
+export function categorizeFood(name: string): FoodCategory { ... }
+export function getClosureDisplayLocation(c: ClosureSchedule, items: FoodItem[]): string { ... }
 ```
+**Status:** ✅ Both web and mobile now import from `shared/business-logic.ts`
 
-### 3. Extract Constants
+### 3. Extract Constants ❌ **NOT DONE YET**
 ```typescript
-// shared/constants.ts
+// shared/constants.ts - TODO
 export const HOME_CATEGORIES = ["Fridge", "Snacks"];
 export const CLEANING_COLOR = "#2563eb";
 export const TIMEOFF_COLOR = "#f59e0b";
 ```
+**Status:** ❌ Still duplicated in both platforms
 
-### 4. Update Both Platforms
-- Web: `import { capitalizeWords } from "@/shared/utils"`
-- Mobile: `import { capitalizeWords } from "../shared/utils"`
+### 4. Update Both Platforms ✅ **DONE**
+- Web: `import { capitalizeWords } from "../../../shared/utils"` ✅
+- Mobile: `import { capitalizeWords } from "../../../shared/utils"` ✅
 
 ---
 
@@ -198,10 +217,10 @@ export const TIMEOFF_COLOR = "#f59e0b";
 ## Success Metrics
 
 **After implementing shared logic:**
-- [ ] Bug fixes apply to both platforms automatically
-- [ ] New features only need UI implementation (not logic)
-- [ ] Consistent behavior across platforms
-- [ ] Less time spent on mobile sync
+- [x] Bug fixes apply to both platforms automatically ✅ (for shared functions)
+- [x] Consistent behavior across platforms ✅ (for shared functions)
+- [x] Less code duplication ✅ (~200 lines removed)
+- [ ] New features only need UI implementation (not logic) - *Partially done, more functions can be shared*
 
 ---
 

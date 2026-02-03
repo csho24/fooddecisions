@@ -2,7 +2,12 @@
 
 **Purpose:** Bring the mobile app in line with recent web changes. Web is the primary test surface; changes should be transferred to mobile so both behave the same.
 
-**Last updated:** Feb 2026 (from recent chat changes)
+**Last updated:** Feb 3, 2026
+
+**Note:** Some business logic functions are now shared in `shared/` folder:
+- ✅ `shared/utils.ts` - capitalizeWords, normalizeLocKey
+- ✅ `shared/business-logic.ts` - categorizeFood, getClosureDisplayLocation
+Both web and mobile import from these shared files, reducing duplication.
 
 **Verification:** Plan items are checked against **current web code** (client/src) so we don’t ask mobile to “fix” something web doesn’t do or overwrite with old doc behavior. Where web and mobile already match, the plan says “Parity: matched” and no change is requested.
 
