@@ -459,15 +459,16 @@ Even with 10-minute intervals (which should prevent the 15-minute spin-down), th
 - Interval set to 5 minutes
 - Monitoring to see if 5-minute interval prevents failures long-term
 
-**Key Insight - Mathematical Alignment Issue:**
-Even with perfect timing, failures can occur due to alignment:
+**Key Insight - Mathematical Alignment Issue (Design Flaw):**
+The original logic assumed "10 minutes < 15 minutes, so it works" without accounting for mathematical alignment. This is a **design flaw**, not bad luck:
+
 - Cron intervals are multiples of 5 (5, 10, 15 minutes)
 - Render spins down after 15 minutes
 - 15 is a multiple of 5 (5 × 3 = 15)
-- If cron start time aligns with Render's 15-minute check points, they can clash
+- If cron start time aligns with Render's 15-minute check points, they clash
 - Example: Cron hits at 10:00, 10:05, 10:10, 10:15... Render checks at 10:15, 10:30, 10:45... They align at 10:15, 10:30, etc.
 
-**It's luck-based** - depends on when server starts vs when cron starts. If they align, can still fail even with 5-minute intervals.
+**The problem:** Whether they align depends on when the server starts vs when cron starts. This wasn't accounted for in the original design. If start times align, failures can occur even with 5-minute intervals. Proper planning would have tested for alignment scenarios and designed around them from the start.
 
 ### Potential Future Fix
 
@@ -477,14 +478,17 @@ Even with perfect timing, failures can occur due to alignment:
 - Avoid hitting Render's 15-minute check points
 - Requires knowing exact server start time and setting cron offset accordingly
 
-**Note:** Testing 5-minute intervals. May fail again depending on alignment. Hard to predict without knowing exact start times.
+**Note:** Testing 5-minute intervals. May fail again if start times align with Render's 15-minute check points. Cannot predict without knowing exact server start time and cron start time.
 
 ### Lessons Learned
 
-1. **Mathematical alignment matters:** Even with perfect timing, multiples can align (5 × 3 = 15)
-2. **Start time matters:** When cron starts vs when server starts determines if they align
-3. **Cron auto-disable is too aggressive:** Even temporary issues cause the cron to disable itself, leaving no protection
-4. **Free tier limitations:** Render's free tier requires aggressive intervals and still has alignment risks
+1. **Plan for mathematical alignment from the start:** The original logic didn't account for multiples aligning (5 × 3 = 15). This is a design flaw, not bad luck. Should have tested alignment scenarios during initial design.
+
+2. **Start time offsets matter:** When cron starts vs when server starts determines if they align. This should be part of the initial design, not discovered after failures.
+
+3. **Cron auto-disable is too aggressive:** Even temporary issues cause the cron to disable itself, leaving no protection. This compounds the alignment problem.
+
+4. **Free tier limitations:** Render's free tier requires aggressive intervals and still has alignment risks. Proper planning would account for these limitations upfront.
 
 
 
