@@ -12,11 +12,12 @@ This document explains how the Food Compass website works, covering architectura
 2. [Automatic Text Capitalization](#2-automatic-text-capitalization)
 3. [Food Categorization System](#3-food-categorization-system)
 4. [Closure Schedule System](#4-closure-schedule-system)
-5. [Location Management](#5-location-management)
-6. [State Management](#6-state-management)
-7. [Form Validation](#7-form-validation)
-8. [UI/UX Patterns](#8-uiux-patterns)
-9. [Mobile-First Design](#9-mobile-first-design)
+5. [Calendar](#5-calendar)
+6. [Location Management](#6-location-management)
+7. [State Management](#7-state-management)
+8. [Form Validation](#8-form-validation)
+9. [UI/UX Patterns](#9-uiux-patterns)
+10. [Mobile-First Design](#10-mobile-first-design)
 
 ---
 
@@ -313,7 +314,72 @@ Mobile app now has full calendar functionality matching web:
 
 ---
 
-## 5. Location Management
+## 5. Calendar
+
+The closure calendars (Cleaning and Time Off tabs in Add Info) use **react-day-picker** wrapped by a shared UI component. Behaviour is driven by **modifiers** (which dates are cleaning vs time off vs today) and a **custom DayButton** that overrides colours and “today” styling.
+
+### Files
+
+- **Component:** `client/src/components/ui/calendar.tsx` – exports `Calendar` (wraps `DayPicker`) and `CalendarDayButton`
+- **Usage:** `client/src/pages/add-details.tsx` – two calendar instances (Cleaning tab, Time Off tab)
+
+### Library and wrapper
+
+- **react-day-picker** provides `DayPicker` (month grid, navigation, `mode="multiple"`) and a default `DayButton`. The app passes a custom `DayButton` so each day cell is rendered with closure-specific colours and “today” styling.
+- **Calendar** (`calendar.tsx`) sets `classNames` (e.g. `day` with `rounded-xl`), `--cell-size`, custom **Day** (the `<td>`: `border-0 border-transparent p-0.5` to avoid stray borders), **MonthGrid** (table with `borderCollapse: separate`, `borderSpacing`), and defaults **DayButton** to `CalendarDayButton`. Callers can override `components.DayButton` (add-details does).
+- **CalendarDayButton** is a `Button` with `rounded-xl` and range/today-related data attributes. add-details replaces it per calendar with an inline component that reads `modifiers` and applies the rules below.
+
+### Modifiers (who gets which style)
+
+Each calendar passes:
+
+- **cleaning** – array of dates that count as “cleaning” (saved cleaning and/or currently selected for cleaning on the Cleaning tab; saved-only on the Time Off tab).
+- **timeoff** – array of dates that count as “time off” (saved time off and/or currently selected on the Time Off tab).
+- **today** – comes from react-day-picker from the current date.
+
+So for any given day the custom DayButton knows: `isCleaning`, `isTimeoff`, `isToday`. It also uses `both = isCleaning && isTimeoff` for same-day cleaning + time off.
+
+### Day cell styling (custom DayButton in add-details)
+
+Applied in this order (later classes override when both apply):
+
+| Condition | Result |
+|-----------|--------|
+| **both** (cleaning and time off same day) | Half block: left half blue `#60a5fa`, right half amber `#fbbf24` via inline `style` gradient; text black. |
+| **cleaning only** (Cleaning tab) | Single-location: `#60a5fa`. Two or more distinct locations on that date: darker blue `#1e40af`. Text black. |
+| **cleaning only** (Time Off tab) | `#60a5fa`, text black. |
+| **time off only** | Amber `#f59e0b`, text black. |
+| **today, no closure** | Green text, bold, slightly larger: `!text-green-600 !font-bold !text-base`. |
+| **today, with closure** | Same block colour as above; number only gets **bold + slightly larger** (`!font-bold !text-base`), no green. |
+| **selected (Cleaning tab only)** | Orange ring: `!ring-2 !ring-orange-500 !ring-offset-2`. |
+
+`modifiersStyles` in add-details (cleaning/timeoff/today) are fallbacks; the custom DayButton overrides them for the rules above.
+
+### Selection behaviour
+
+- **Cleaning tab**
+  - `selected={selectedCleaningDates}` only (saved cleaning dates are **not** in `selected`), so clicking a saved cleaning date doesn’t toggle it off; it stays blue and can be added to selection so the user can add another location for that date.
+  - `onSelect` receives all selected dates; we filter out time-off-only dates and set `selectedCleaningDates`.
+  - Days that are saved time off are `disabled` so they can’t be selected for cleaning.
+  - When the user clicks a day that is already saved for cleaning but not in `selectedCleaningDates`, the DayButton `onClick` adds that date to `selectedCleaningDates` so the flow can continue (e.g. “add another stall for this date”).
+- **Time Off tab**
+  - `selected` / selection state is used for newly chosen time off dates; saved time off is in the `timeoff` modifier. Dates that are saved cleaning are `disabled` for time off.
+  - Same DayButton styling rules (half block, cleaning blue, time off amber, today bold/larger).
+
+### Tooltips
+
+- Cleaning tab: tooltip shows location(s) and “Cleaning” where useful; for a single closure, location + food if available.
+- Time Off tab: tooltip from `getClosureTooltip(closure)` (e.g. location and date range).
+
+### Summary
+
+- **One “today”** per view: the day number is green + bold + larger when it’s today and not a closure; when it’s today and has a closure it’s still bold + larger so “today” stays obvious.
+- **Colours:** Single-location cleaning = lighter blue `#60a5fa`; 2+ locations = darker blue `#1e40af`; time off = amber; half block = blue left, amber right.
+- **Selection** is kept separate from “saved” so the calendar doesn’t toggle off saved closure dates when clicking them; the custom DayButton and `disabled` handle cleaning vs time off conflicts.
+
+---
+
+## 6. Location Management
 
 ### File: `client/src/pages/add-details.tsx`
 
@@ -388,7 +454,7 @@ Opening hours are hidden behind a toggle to keep the UI simple for basic use cas
 
 ---
 
-## 6. State Management
+## 7. State Management
 
 ### Strategy: Local State for UI, Store for Data
 
@@ -419,7 +485,7 @@ const { items, addItem, updateItem, removeItem } = useFoodStore();
 
 ---
 
-## 7. Form Validation
+## 8. Form Validation
 
 ### Using Zod Schemas
 
@@ -449,7 +515,7 @@ Match schema's required fields to what's actually essential. Everything else opt
 
 ---
 
-## 8. UI/UX Patterns
+## 9. UI/UX Patterns
 
 ### Consistent Sizing
 
@@ -489,7 +555,7 @@ All interactive elements meet the **44x44px minimum** touch target guideline:
 
 ---
 
-## 9. Mobile-First Design
+## 10. Mobile-First Design
 
 ### Touch Interactions
 

@@ -16,13 +16,25 @@ This document tracks specific problems encountered and their solutions.
 - **Today:** Current date shows as **green text only** (no background block). In add-details, custom DayButton checks `modifiers.today` and when it’s today and not a closure date applies `!text-green-600`. Closure dates (blue/amber blocks) unchanged; today with a closure keeps the block.
 - **Today block removed:** Removed any “today” background/shade so today isn’t orange or a green block—only the number is green when it’s a plain day.
 - **Blue border fix:** A visible blue border on closure dates was caused by cell padding on the custom Day `<td>`. Removed that padding and set `border-0 border-transparent` on day cells and `border-0` on the calendar table so no inherited border shows.
+- **Cleaning blue lighter:** Only the **org/single-location** cleaning blue was made lighter: `#60a5fa` (was `#2563eb`). The overlapping/darker blue for 2+ locations stays `#1e40af`. modifiersStyles.cleaning fallback `#60a5fa`. Half-block styling unchanged.
 - **Spacing (gaps between day blocks):** Tried table `border-spacing` + custom MonthGrid (inline style), CSS override in index.css (`.group/calendar table.rdp-month_grid` with `!important`), and small cell padding (`p-0.5`). Table spacing didn’t reliably apply (Tailwind base `table { border-collapse: collapse }` or load order). Cell padding created the blue border. **Conclusion:** No reliable way in this stack to add visible gaps without side effects; day blocks remain touching.
 - **Debug:** Console and DOM confirmed custom Calendar components (Root, MonthGrid, Day) run on `/add` closure calendars. Root has `group/calendar`; table gets our inline `borderCollapse: separate` and `borderSpacing` but visual gap still doesn’t show.
+
+### Home banner — closure count not date (8 Feb)
+
+**Problem:** "Closed Today" banner showed the **day of the month** (e.g. 8) instead of the number of stalls closed, so it read like "8 Ghim Moh Stalls closed today" (user thought 8 stalls when it was one time off).
+
+**Root cause:** Banner used `new Date().getDate()` (1–31) instead of the closure count for that group.
+
+**Fix:** `closureBannerGroups` now includes `count: closures.length`. Banner line: `{g.count} {g.location} stall(s) closed today`. **File:** `client/src/pages/home.tsx`
+
+**Note:** Time off list date-range grouping (one row per stall with e.g. "9–15 Feb") is implemented in `add-details.tsx` via `buildTimeOffGroups` and `mergeConsecutiveDates`; not separately logged here.
 
 ## Files changed (8 Feb)
 
 - `client/src/components/ui/calendar.tsx` – Custom Day (border-0, no today bg), custom MonthGrid (inline spacing), today class no accent; debug logs and data attributes.
 - `client/src/pages/add-details.tsx` – Today = green text only when `isToday && !hasClosure` (`!text-green-600`); modifiersStyles.today = transparent; closure colors unchanged.
+- `client/src/pages/home.tsx` – Home banner shows closure count instead of day of month.
 - `client/src/index.css` – Override for calendar table spacing (`.group\/calendar table.rdp-month_grid` with border-separate and border-spacing); not effective for gap in practice.
 
 ---

@@ -50,7 +50,8 @@ export default function Home() {
     }
     return Array.from(byLocation.entries()).map(([location, closures]) => ({
       location,
-      isCleaning: closures.some(c => c.type === 'cleaning')
+      isCleaning: closures.some(c => c.type === 'cleaning'),
+      count: closures.length
     }));
   }, [todaysClosures]);
 
@@ -88,7 +89,7 @@ export default function Home() {
                 <div className="space-y-1">
                   {closureBannerGroups.map((g, i) => (
                     <p key={i} className={g.isCleaning ? "text-blue-700 text-sm" : "text-amber-700 text-sm"}>
-                      {new Date().getDate()} {g.location} Stalls closed today
+                      {g.count} {g.location} stall{g.count !== 1 ? 's' : ''} closed today
                     </p>
                   ))}
                 </div>
