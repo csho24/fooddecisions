@@ -518,6 +518,20 @@ If the cron service uses fixed slots (:00, :15, :30, :45), then with **server** 
 **Verification (Feb 8):**  
 Health response showed `serverStartTime` 04:36:02 UTC, first cron hit 04:37:01 UTC. Difference 1 minute (not a multiple of 5) → no alignment.
 
+### Latest Failure (after 5 cron hits; 3pm success not counted)
+
+- **Server start:** 12:35 PM (user loaded site)
+- **First cron:** 12:45 PM
+- **Outcome:** 5 successful cron hits, then failure. **Failure at 2 PM.** (The 3pm success is not counted in the “5 hits.”)
+- **Possible reason it failed at 2 PM:** Each cron hit resets Render's 15-min timer. So after 12:45, the effective server start becomes 12:45, and server checks move to 12:45, 1:00, 1:15, 1:30, 1:45, 2:00 — the same minutes as cron. At 2:00 both a server spin-down check and a cron hit occur. If Render runs the 15-min spin-down check in that same minute before counting the cron request as activity, the server spins down and the cron request gets 503. Same grid plus order of operations = fail at 2 PM.
+
+### Latest new attempt (new variables)
+
+- **Cron job disable:** Turned off (no longer auto-disable after failures).
+- **Interval:** Left at **15 minutes**.
+- **Cron run times (example):** 5:40 PM, 5:50 PM, … (runs as configured).
+- **Rationale:** With disable off, temporary clashes may still cause 503s but the job keeps running and can recover instead of turning off for good.
+
 ### Lessons Learned
 
 1. **Plan for mathematical alignment from the start:** The original logic didn't account for multiples aligning (5 × 3 = 15). This is a design flaw, not bad luck. Should have tested alignment scenarios during initial design.
