@@ -1,13 +1,15 @@
 # Localhost Development Server Fix - December 9, 2024
 
+**fooddec:** port 5173.
+
 ## Add page file path and verifying which bundle is loaded (Feb 2025)
 
-**The only page that renders at `http://localhost:8080/add` is:**
+**The only page that renders at `http://localhost:5173/add` is:**
 - **File:** `client/src/pages/add-details.tsx`  
 - **Full path:** `Food-Compass/client/src/pages/add-details.tsx` (from repo root)
 
 To confirm the browser is running the **current** code (no instruction under Cleaning Days location input):
-1. Go to `http://localhost:8080/add` → Cleaning Days → select one day so the location input appears.
+1. Go to `http://localhost:5173/add` → Cleaning Days → select one day so the location input appears.
 2. Use **Find in Page** (Cmd+F / Ctrl+F) and search for: **`ADD_DETAILS_NO_INSTR`**
 3. If that string is found → the new bundle is loaded (instruction is removed in this build).
 4. If it is **not** found → the browser is still using an old cached bundle; try hard refresh (Cmd+Shift+R), or open the URL in an Incognito/Private window, or clear site data for localhost:8080.

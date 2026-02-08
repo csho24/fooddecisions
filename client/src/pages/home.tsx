@@ -139,7 +139,7 @@ export default function Home() {
               </motion.div>
             </Link>
 
-            {/* Add Info Card */}
+            {/* Add Dates Card */}
             <Link href="/add">
               <motion.div 
                 variants={item}
@@ -153,7 +153,7 @@ export default function Home() {
                     <Plus size={20} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-foreground">Add Info</h2>
+                    <h2 className="text-xl font-bold text-foreground">Add Dates</h2>
                   </div>
                 </div>
               </motion.div>

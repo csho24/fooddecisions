@@ -640,7 +640,7 @@ Single form component with conditional logic based on whether editing existing i
 - **Styling:** Tailwind CSS
 - **Animations:** Framer Motion
 - **Backend:** Express.js + Node.js
-- **Database:** PostgreSQL (Neon)
+- **Database:** PostgreSQL (Neon). Food items, closure schedules, and **archived items** (eaten/thrown) are all persisted in Neon.
 - **Hosting:** Render.com
 - **Mobile:** Expo Go (development)
 
@@ -742,7 +742,7 @@ const getTitle = () => {
 
 ## Database Migrations - MUST RUN SQL MANUALLY
 
-When adding new database columns, the SQL must be run manually in Neon console.
+Food items, closure schedules, and archived items (eaten/thrown) are all stored in Neon. When adding new database columns, the SQL must be run manually in Neon console.
 
 ### Expiry Date Column (Dec 20, 2024)
 ```sql
