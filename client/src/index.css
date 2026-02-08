@@ -93,6 +93,12 @@
   --ring: 25 90% 55%;
 }
 
+/* Calendar: space between day cells — override Tailwind base (table { border-collapse: collapse }) and lib */
+.group\/calendar table.rdp-month_grid {
+  border-collapse: separate !important;
+  border-spacing: 0.5rem !important;
+}
+
 @layer base {
   * {
     @apply border-border;

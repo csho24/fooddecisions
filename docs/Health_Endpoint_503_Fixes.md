@@ -480,6 +480,44 @@ The original logic assumed "10 minutes < 15 minutes, so it works" without accoun
 
 **Note:** Testing 5-minute intervals. May fail again if start times align with Render's 15-minute check points. Cannot predict without knowing exact server start time and cron start time.
 
+---
+
+## Update: February 8, 2026 - Multiples / Alignment Fix
+
+**Date:** February 8, 2026  
+**Issue:** 5-minute interval failed again (Render failed early morning next day). Need a fix that addresses alignment, not just interval length.  
+**Status:** ✅ Final fix applied (offset start times)
+
+### Initial Thoughts on Multiples
+
+- Failures aren't just "luck" or external factors; the logic didn't plan for **multiples**.
+- Server wind-down is **additions to start time**: T, T+15, T+30, … (multiples of 15 from when last activity happened).
+- Cron hits are **additions to its start time**: S, S+5, S+10, … (multiples of 5/10/15 depending on interval).
+- **They meet** when the two sequences hit the same minute → when **(cron start − server start) is a multiple of 5** (for 10-min cron) or **a multiple of 15** (for 15-min cron).
+- So the fix is: **don't start cron at a time that's a multiple of 5 (or 15) minutes after the server's last activity.** It's about multiples of 5/10/15, not "odds and evens" in a vague sense.
+
+### Why 5-Minute Interval Might Not Have Worked Last Round
+
+1. **Alignment:** Even at 5-minute intervals, if cron start and server start differed by a multiple of 5, the sequences still aligned and could clash.
+2. **Fixed slots:** Many cron services don't run "every 5 min from when I enabled" — they use **fixed clock slots** (:00, :15, :30, :45 for "every 15 min"). So enabling at 12:36 might still schedule next run at 12:45, i.e. back on the quarter-hour. That would undo any intended offset and put cron on the same grid as server checks when the server started on a quarter-hour.
+
+### Test and Final Fix (February 8, 2026)
+
+**Procedure:**
+1. Load the website at a chosen time (e.g. **12:35**) so the server's 15-minute timer resets at 12:35.
+2. Enable cron **one minute later** (e.g. **12:36** or **12:37**) so cron start and server start do **not** differ by a multiple of 5 (or 15).
+3. Use **10-minute** or **15-minute** intervals (can go back to 15 now that offset is planned).
+4. **30-minute** intervals are risky: no safety margin if one hit fails (next hit is 30 min later, server spins down at 15 min).
+
+**Rule:**  
+Cron start minute and server "start" minute (when you loaded the site) must **not** differ by a multiple of 5 (for 10-min) or 15 (for 15-min). Then the two sequences never meet.
+
+**Fixed-slot cron (e.g. "next execution 12:45"):**  
+If the cron service uses fixed slots (:00, :15, :30, :45), then with **server** started at 12:35, server checks are at **:35, :50, :05, :20** and cron runs at **:45, :00, :15, :30**. Those minute-sets don't overlap, so they **never** meet — no alignment. So starting the site at 12:35 and letting cron use fixed 12:45, 1:00, … is still safe.
+
+**Verification (Feb 8):**  
+Health response showed `serverStartTime` 04:36:02 UTC, first cron hit 04:37:01 UTC. Difference 1 minute (not a multiple of 5) → no alignment.
+
 ### Lessons Learned
 
 1. **Plan for mathematical alignment from the start:** The original logic didn't account for multiples aligning (5 × 3 = 15). This is a design flaw, not bad luck. Should have tested alignment scenarios during initial design.

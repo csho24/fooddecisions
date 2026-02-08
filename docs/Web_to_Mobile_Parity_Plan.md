@@ -36,8 +36,11 @@ Everything we changed on web in this chat is listed below with **Applied to mobi
 | 15 | **Past dates selectable in Time Off:** Past dates no longer disabled in Time Off calendar | ❌ No | Mobile still disables past dates () - remove this restriction. |
 | 16 | **Selected dates banner:** Shows "2 days — 9 Feb, 10 Feb" under calendar when dates selected | ❌ No | Add banner showing selected dates count and list. |
 | 17 | **getClosureDisplayLocation exact match:** Uses exact match (case-insensitive) instead of includes() to prevent wrong location display | ❌ No | **CRITICAL:** See section 0c below for detailed steps. |
+| 18 | **Time off date range grouping:** Time off list grouped by stall + consecutive dates (e.g. "Margaret Drive › Duck Rice — 9–15 Feb" one row, not 7 rows) | ❌ No | **CRITICAL:** Same logic as cleaning: buildTimeOffGroups, mergeConsecutiveDates; list shows groups with date range; delete group = delete all ids. |
+| 19 | **Time off: same date many times:** One date can have multiple time-off entries (different stalls) and both cleaning + time off; no disabling dates for time off | ❌ No | **CRITICAL:** selected=selectedTimeOffDates only; disabled=undefined; onSelect accepts all dates; allow adding time off on dates that already have cleaning or time off. |
+| 20 | **Combo color (cleaning + time off same day):** When a date has BOTH cleaning and time off, show blue-to-amber gradient (not default to orange/last input) | ❌ No | **CRITICAL:** In DayButton, if isCleaning && isTimeoff use combo style (e.g. gradient from blue to amber); otherwise blue-only or amber-only. |
 
-**Summary:** Items 1–3, 5–7 are done on mobile. Item 4 (tooltip) and 9 (input alignment) are optional/low. Item 8 – **Home closure banner colors** still needs to be done on mobile. Item 10 – **Decide** (tabs + drill + hide back) is the big parity piece not yet on mobile. **Items 11–17 are February 3, 2026 calendar fixes that need to be replicated on mobile.**
+**Summary:** Items 1–3, 5–7 are done on mobile. Item 4 (tooltip) and 9 (input alignment) are optional/low. Item 8 – **Home closure banner colors** still needs to be done on mobile. Item 10 – **Decide** (tabs + drill + hide back) is the big parity piece not yet on mobile. **Items 11–20** are calendar/time-off fixes that need to be replicated on mobile (section 0c + items 18–20).
 
 ---
 
@@ -256,6 +259,53 @@ if (isDateSaved(date, type)) return; // ❌ WRONG - prevents selecting saved dat
 
 ---
 
+### Fix 9: Time Off Date Range Grouping (Same as Cleaning)
+
+**Problem:** Time off list shows one row per day (e.g. 7 rows of "Duck Rice closed" for a week). Should show one row per stall with date range (e.g. "Margaret Drive › Duck Rice — 9–15 Feb").
+
+**What to Do:** Reuse the same grouping logic as cleaning:
+1. **buildTimeOffGroups(timeoffClosures):** Group by stall (location + food item name). For each stall, collect date → ids. Run **mergeConsecutiveDates** on that map to get date ranges. Produce list of `{ type: 'timeoff', dateRange, displayLabel, ids }`.
+2. **Scheduled list:** Show time off as grouped rows (displayLabel + dateRange); one delete = delete all ids in group.
+3. **Do not** show raw time-off closures one-by-one in the list.
+
+**Web Reference:** `client/src/pages/add-details.tsx` – buildTimeOffGroups, TimeOffGroup type, mergeConsecutiveDates (shared with cleaning), list render by entry.type === 'timeoff'.
+
+**Exact Mobile Changes:**
+- Add TimeOffGroup type and buildTimeOffGroups (mirror buildCleaningGroups but for type === 'timeoff', group by location+foodItemName).
+- Build upcomingTimeOffGroups / pastTimeOffGroups and use in list instead of raw time-off array.
+- Render time-off list rows with dateRange and delete group (handleDeleteClosureGroup(g.ids)).
+
+---
+
+### Fix 10: Time Off – Same Date Multiple Times / No Disabled
+
+**Problem:** User must be able to add time off for many stalls on the same day (e.g. CNY); same date can have both cleaning and time off. Calendar must not "default to orange" or block selection.
+
+**What to Do:**
+1. **selected** = only `selectedTimeOffDates` (user selection), not saved dates.
+2. **disabled** = none (or only block cleaning days if you want; web allows all).
+3. **onSelect** = accept all selected dates; allow same date to be selected again after saving (so they can pick another stall).
+4. **DayButton:** When date has **both** cleaning and time off, show **combo style** (Fix 11).
+
+**Web Reference:** `client/src/pages/add-details.tsx` – Time Off Calendar selected/onSelect/disabled, and DayButton combo (both).
+
+---
+
+### Fix 11: Combo Color (Cleaning + Time Off Same Day)
+
+**Problem:** When a date has both cleaning and time off, the cell was defaulting to one color (e.g. orange/last input). User needs to see that both apply.
+
+**What to Do:** In the calendar DayButton for both Cleaning and Time Off tabs:
+- If `isCleaning && isTimeoff` → apply **combo style**: e.g. blue-to-amber gradient (`from-[#2563eb] to-[#f59e0b]`), or half-and-half, so it’s clearly both.
+- Else if only cleaning → blue; else if only time off → amber.
+
+**Web Reference:** `client/src/pages/add-details.tsx` – DayButton: `style={both ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)' } : undefined}`, and single-color `#60a5fa` / `#fbbf24`.
+
+**Exact Mobile Changes:**
+- Cleaning-only: background #60a5fa, white text. Time-off-only: background #fbbf24, dark text. Both: literal two halves (left blue, right amber), e.g. two View columns or 50%-50% linear gradient with hard stop.
+
+---
+
 ### Summary Checklist for Mobile
 
 - [ ] **Fix 1:** Multi-date selection - Remove `isDateSaved(date, type)` check, ensure multiple dates accumulate, add orange border style
@@ -266,9 +316,13 @@ if (isDateSaved(date, type)) return; // ❌ WRONG - prevents selecting saved dat
 - [ ] **Fix 6:** Remove Past closures section - Delete the View block showing past closures list
 - [ ] **Fix 7:** Make past dates selectable - Remove `isPast` restriction for timeoff type
 - [ ] **Fix 8:** Selected dates banner - Add banner showing "X days — dates" after calendar
+- [ ] **Fix 9:** Time off date range grouping - buildTimeOffGroups, list by group with date range, delete group
+- [ ] **Fix 10:** Time off same date multiple times - selected=user only, no disabled, allow re-select after save
+- [ ] **Fix 11:** Combo color - when date has both cleaning and time off, show blue-to-amber gradient (not default to one color)
 
 **Reference Files:**
-- Web calendar logic: `client/src/pages/add-details.tsx` lines 655-750 (Cleaning calendar), 1110-1167 (Time Off calendar)
+- Web calendar logic: `client/src/pages/add-details.tsx` (Cleaning calendar, Time Off calendar, DayButton combo style)
+- Web grouping: buildCleaningGroups, buildTimeOffGroups, mergeConsecutiveDates (same file)
 - Web location normalization: `client/src/pages/add-details.tsx` lines 177-201, 854, 899-930
 - Calendar Problems doc: `docs/Calendar Problems and Fixes.md` (February 3, 2026 section)
 

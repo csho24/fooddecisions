@@ -19,15 +19,27 @@ function Calendar({
   buttonVariant = "ghost",
   formatters,
   components,
+  cellSize,
+  style,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"]
+  /** Override day cell size (e.g. "1.5rem"). Applied via inline style so it reliably overrides the default 2rem. */
+  cellSize?: string
 }) {
   const defaultClassNames = getDefaultClassNames()
+  const rootStyle = cellSize
+    ? { ...style, ["--cell-size" as const]: cellSize }
+    : style
+
+  React.useEffect(() => {
+    console.log("[Calendar] mounted, cellSize:", cellSize, "className prop:", className?.slice?.(0, 80))
+  }, [cellSize, className])
 
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      style={rootStyle}
       className={cn(
         "bg-background group/calendar p-3 [--cell-size:2rem] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
@@ -84,7 +96,10 @@ function Calendar({
             : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5",
           defaultClassNames.caption_label
         ),
-        table: "w-full border-collapse",
+        month_grid: cn(
+          defaultClassNames.month_grid,
+          "w-full border-separate [border-spacing:0.25rem]"
+        ),
         weekdays: cn("flex", defaultClassNames.weekdays),
         weekday: cn(
           "text-muted-foreground flex-1 select-none rounded-md text-[0.8rem] font-normal",
@@ -110,7 +125,7 @@ function Calendar({
         range_middle: cn("rounded-none", defaultClassNames.range_middle),
         range_end: cn("bg-accent rounded-r-md", defaultClassNames.range_end),
         today: cn(
-          "bg-accent text-accent-foreground rounded-md data-[selected=true]:rounded-none",
+          "rounded-md data-[selected=true]:rounded-none",
           defaultClassNames.today
         ),
         outside: cn(
@@ -125,10 +140,48 @@ function Calendar({
         ...classNames,
       }}
       components={{
+        ...components,
+        Day: ({ className, style, ...props }) => {
+          if (typeof window !== "undefined" && !(window as unknown as { __calendarDayLogged?: boolean }).__calendarDayLogged) {
+            (window as unknown as { __calendarDayLogged: boolean }).__calendarDayLogged = true
+            console.log("[Calendar Day] custom Day rendering, td className:", className?.slice?.(0, 100))
+          }
+          return (
+            <td
+              {...props}
+              className={cn(className, "border-0 border-transparent p-0.5")}
+              style={style}
+              data-calendar-day="true"
+            />
+          )
+        },
+        MonthGrid: ({ className, style, ...props }) => {
+          if (typeof window !== "undefined" && !(window as unknown as { __calendarTableLogged?: boolean }).__calendarTableLogged) {
+            (window as unknown as { __calendarTableLogged: boolean }).__calendarTableLogged = true
+            console.log("[Calendar MonthGrid] custom table rendering, className:", className?.slice?.(0, 100), "style:", style)
+          }
+          return (
+            <table
+              {...props}
+              className={cn(defaultClassNames.month_grid, "w-full border-0", className)}
+              style={{
+                ...style,
+                borderCollapse: "separate",
+                borderSpacing: "0.5rem",
+              }}
+              data-calendar-table="true"
+            />
+          )
+        },
         Root: ({ className, rootRef, ...props }) => {
+          if (typeof window !== "undefined" && !(window as unknown as { __calendarRootLogged?: boolean }).__calendarRootLogged) {
+            (window as unknown as { __calendarRootLogged: boolean }).__calendarRootLogged = true
+            console.log("[Calendar Root] custom Root, has group/calendar:", className?.includes?.("group/calendar"), "className slice:", className?.slice?.(0, 120))
+          }
           return (
             <div
               data-slot="calendar"
+              data-calendar-debug="ui-calendar-v1"
               ref={rootRef}
               className={cn(className)}
               {...props}

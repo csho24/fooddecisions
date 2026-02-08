@@ -154,7 +154,9 @@ export default function AddPage() {
   };
 
   // Group cleaning by (location, date range); consecutive dates become "16–17 Mar"
-  type CleaningGroup = { dateRange: string; displayLoc: string; ids: number[] };
+  type CleaningGroup = { type: 'cleaning'; dateRange: string; displayLoc: string; ids: number[] };
+  type TimeOffGroup = { type: 'timeoff'; dateRange: string; displayLabel: string; ids: number[] };
+  type ClosureListEntry = CleaningGroup | TimeOffGroup;
   const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const formatDateRange = (start: string, end: string): string => {
     const [, m1, d1] = start.split('-').map(Number);
@@ -209,17 +211,38 @@ export default function AddPage() {
     const result: CleaningGroup[] = [];
     for (const { displayLoc, dateToIds } of Array.from(byLoc.values())) {
       for (const { dateRange, ids } of mergeConsecutiveDates(dateToIds)) {
-        result.push({ dateRange, displayLoc, ids });
+        result.push({ type: 'cleaning', dateRange, displayLoc, ids });
+      }
+    }
+    return result;
+  };
+  const buildTimeOffGroups = (closures: ClosureSchedule[]): TimeOffGroup[] => {
+    const timeoff = closures.filter(c => c.type === 'timeoff');
+    const byStall = new Map<string, { displayLabel: string; dateToIds: Map<string, number[]> }>();
+    for (const c of timeoff) {
+      const displayLoc = getClosureDisplayLocation(c);
+      const label = displayLoc && c.foodItemName ? `${displayLoc} › ${c.foodItemName}` : (c.foodItemName || displayLoc || '');
+      const stallKey = normalizeLocKey(displayLoc || '') + '|' + normalizeLocKey(c.foodItemName || '');
+      if (!byStall.has(stallKey)) byStall.set(stallKey, { displayLabel: label, dateToIds: new Map() });
+      const entry = byStall.get(stallKey)!;
+      const ids = entry.dateToIds.get(c.date) ?? [];
+      ids.push(c.id);
+      entry.dateToIds.set(c.date, ids);
+    }
+    const result: TimeOffGroup[] = [];
+    for (const { displayLabel, dateToIds } of Array.from(byStall.values())) {
+      for (const { dateRange, ids } of mergeConsecutiveDates(dateToIds)) {
+        result.push({ type: 'timeoff', dateRange, displayLabel, ids });
       }
     }
     return result;
   };
   const upcomingCleaningGroups = buildCleaningGroups(upcomingClosures);
-  const upcomingTimeOff = upcomingClosures.filter(c => c.type === 'timeoff');
+  const upcomingTimeOffGroups = buildTimeOffGroups(upcomingClosures);
   const pastCleaningGroups = buildCleaningGroups(pastClosures);
-  const pastTimeOff = pastClosures.filter(c => c.type === 'timeoff');
-  const upcomingClosuresList = [...upcomingCleaningGroups, ...upcomingTimeOff];
-  const pastClosuresList = [...pastCleaningGroups, ...pastTimeOff];
+  const pastTimeOffGroups = buildTimeOffGroups(pastClosures);
+  const upcomingClosuresList: ClosureListEntry[] = [...upcomingCleaningGroups, ...upcomingTimeOffGroups];
+  const pastClosuresList: ClosureListEntry[] = [...pastCleaningGroups, ...pastTimeOffGroups];
 
   const handleDeleteClosure = async (id: number) => {
     try {
@@ -607,27 +630,24 @@ export default function AddPage() {
                     setSelectedCleaningDates([]);
                     return;
                   }
-                  // Filter out saved dates (both types) - only keep newly selected ones
-                  const newDates = dates.filter(d => 
-                    !isDateSaved(d, 'cleaning') && !isDateSaved(d, 'timeoff')
-                  );
-                  setSelectedCleaningDates(newDates);
+                  // Allow all selected; only exclude dates already saved as cleaning (same date can have time off too)
+                  const newDates = dates.filter(d => !isDateSaved(d, 'cleaning'));
+                  const unique = Array.from(new Map(newDates.map(d => [d.getTime(), d])).values());
+                  setSelectedCleaningDates(unique);
                 }}
-                disabled={(date) => isDateSaved(date, 'timeoff')}
+                disabled={undefined}
                 modifiers={{
                   cleaning: [...getSavedDatesForType('cleaning'), ...selectedCleaningDates],
                   timeoff: getSavedDatesForType('timeoff')
                 }}
                 modifiersStyles={{
                   cleaning: { 
-                    backgroundColor: '#2563eb', 
-                    color: '#ffffff',
-                    opacity: 0.8
+                    backgroundColor: '#60a5fa', 
+                    color: '#ffffff'
                   },
                   timeoff: { 
-                    backgroundColor: '#f59e0b', 
-                    color: '#ffffff',
-                    opacity: 0.8
+                    backgroundColor: '#fbbf24', 
+                    color: '#1f2937'
                   },
                   today: {
                     backgroundColor: 'transparent',
@@ -638,23 +658,31 @@ export default function AddPage() {
                   DayButton: (props) => {
                     const closure = getClosureForDate(props.day.date);
                     const title = closure ? getClosureTooltip(closure) : undefined;
-                    const isCleaning = (props as { modifiers?: { cleaning?: boolean; timeoff?: boolean } }).modifiers?.cleaning;
-                    const isTimeoff = (props as { modifiers?: { cleaning?: boolean; timeoff?: boolean } }).modifiers?.timeoff;
+                    const mods = props as { modifiers?: { cleaning?: boolean; timeoff?: boolean; today?: boolean } };
+                    const isCleaning = mods.modifiers?.cleaning;
+                    const isTimeoff = mods.modifiers?.timeoff;
+                    const isToday = mods.modifiers?.today;
+                    const both = isCleaning && isTimeoff;
+                    const hasClosure = isCleaning || isTimeoff;
                     return (
                       <CalendarDayButton
                         {...props}
                         title={title}
+                        style={both ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)' } : undefined}
                         className={cn(
                           props.className,
-                          "!rounded-xl",
-                          isCleaning && "!bg-[#2563eb] !text-white",
-                          isTimeoff && "!bg-[#f59e0b] !text-white"
+                          "!rounded-xl [&>span]:!opacity-100 font-semibold",
+                          hasClosure && "!text-white",
+                          isToday && !hasClosure && "!text-green-600",
+                          isCleaning && !both && "!bg-[#60a5fa]",
+                          isTimeoff && !both && "!bg-[#fbbf24]"
                         )}
                       />
                     );
                   }
                 }}
-                className="rounded-xl border w-full"
+                cellSize="1.5rem"
+                className="rounded-xl border w-full min-h-[280px]"
               />
               {/* Show scheduled closures list (all entries, scroll if many) */}
               {upcomingClosuresList.length > 0 && (
@@ -665,8 +693,8 @@ export default function AddPage() {
                   <div className="max-h-[220px] overflow-y-scroll overflow-x-hidden rounded-md border border-transparent pr-1" style={{ scrollbarGutter: 'stable' }}>
                     <div className="space-y-1.5 pr-1">
                   {upcomingClosuresList.map((entry) => {
-                    if ('ids' in entry && entry.ids) {
-                      const g = entry as CleaningGroup;
+                    if (entry.type === 'cleaning') {
+                      const g = entry;
                       return (
                         <div key={`cleaning-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
                           <span className="min-w-0 flex-1">{g.displayLoc}</span>
@@ -677,19 +705,19 @@ export default function AddPage() {
                         </div>
                       );
                     }
-                    const c = entry as ClosureSchedule;
-                    const displayLoc = getClosureDisplayLocation(c);
-                    return (
-                      <div key={c.id} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
-                        <span className="min-w-0 flex-1">
-                          {displayLoc && c.foodItemName ? `${displayLoc} › ${c.foodItemName}` : c.foodItemName || displayLoc}
-                        </span>
-                        <span className="opacity-70 shrink-0">{c.date.split('-')[2]}/{c.date.split('-')[1]}</span>
-                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosure(c.id)} aria-label="Delete closure">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    );
+                    if (entry.type === 'timeoff') {
+                      const g = entry;
+                      return (
+                        <div key={`timeoff-${g.dateRange}-${normalizeLocKey(g.displayLabel)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
+                          <span className="min-w-0 flex-1">{g.displayLabel}</span>
+                          <span className="opacity-70 shrink-0">{g.dateRange}</span>
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    }
+                    return null;
                   })}
                     </div>
                   </div>
@@ -705,8 +733,8 @@ export default function AddPage() {
                     <div className="max-h-[220px] overflow-y-scroll overflow-x-hidden rounded-md border border-transparent pr-1" style={{ scrollbarGutter: 'stable' }}>
                       <div className="space-y-1.5 pr-1">
                     {pastClosuresList.map((entry) => {
-                      if ('ids' in entry && entry.ids) {
-                        const g = entry as CleaningGroup;
+                      if (entry.type === 'cleaning') {
+                        const g = entry;
                         return (
                           <div key={`past-cleaning-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
                             <span className="min-w-0 flex-1">{g.displayLoc}</span>
@@ -717,19 +745,19 @@ export default function AddPage() {
                           </div>
                         );
                       }
-                      const c = entry as ClosureSchedule;
-                      const displayLoc = getClosureDisplayLocation(c);
-                      return (
-                        <div key={c.id} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
-                          <span className="min-w-0 flex-1">
-                            {displayLoc && c.foodItemName ? `${displayLoc} › ${c.foodItemName}` : c.foodItemName || displayLoc}
-                          </span>
-                          <span className="opacity-70 shrink-0">{c.date.split('-')[2]}/{c.date.split('-')[1]}</span>
-                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosure(c.id)} aria-label="Delete closure">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      );
+                      if (entry.type === 'timeoff') {
+                        const g = entry;
+                        return (
+                          <div key={`past-timeoff-${g.dateRange}-${normalizeLocKey(g.displayLabel)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
+                            <span className="min-w-0 flex-1">{g.displayLabel}</span>
+                            <span className="opacity-70 shrink-0">{g.dateRange}</span>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      }
+                      return null;
                     })}
                       </div>
                     </div>
@@ -869,33 +897,29 @@ export default function AddPage() {
               <h3 className="font-bold text-lg">Time Off</h3>
               <Calendar
                 mode="multiple"
-                selected={[...getSavedDatesForType('timeoff'), ...selectedTimeOffDates]}
+                selected={selectedTimeOffDates}
                 onSelect={(dates) => {
                   if (!dates) {
                     setSelectedTimeOffDates([]);
                     return;
                   }
-                  // Filter out saved dates (both types) and past dates - only keep newly selected ones
-                  const newDates = dates.filter(d => 
-                    !isDateSaved(d, 'timeoff') && !isDateSaved(d, 'cleaning') && d >= today
-                  );
-                  setSelectedTimeOffDates(newDates);
+                  // One date can have many entries: multiple stalls time off, and cleaning too — allow all
+                  const unique = Array.from(new Map(dates.map(d => [d.getTime(), d])).values());
+                  setSelectedTimeOffDates(unique);
                 }}
-                disabled={(date) => date < today || isDateSaved(date, 'cleaning')}
+                disabled={undefined}
                 modifiers={{
                   cleaning: getSavedDatesForType('cleaning'),
                   timeoff: [...getSavedDatesForType('timeoff'), ...selectedTimeOffDates]
                 }}
                 modifiersStyles={{
                   cleaning: { 
-                    backgroundColor: '#2563eb', 
-                    color: '#ffffff',
-                    opacity: 0.8
+                    backgroundColor: '#60a5fa', 
+                    color: '#ffffff'
                   },
                   timeoff: { 
-                    backgroundColor: '#f59e0b', 
-                    color: '#ffffff',
-                    opacity: 0.8
+                    backgroundColor: '#fbbf24', 
+                    color: '#1f2937'
                   },
                   today: {
                     backgroundColor: 'transparent',
@@ -904,25 +928,36 @@ export default function AddPage() {
                 }}
                 components={{
                   DayButton: (props) => {
-                    const closure = getClosureForDate(props.day.date);
+                    const date = props.day.date;
+                    const closure = getClosureForDate(date);
                     const title = closure ? getClosureTooltip(closure) : undefined;
-                    const isCleaning = (props as { modifiers?: { cleaning?: boolean; timeoff?: boolean } }).modifiers?.cleaning;
-                    const isTimeoff = (props as { modifiers?: { cleaning?: boolean; timeoff?: boolean } }).modifiers?.timeoff;
+                    const mods = props as { modifiers?: { cleaning?: boolean; timeoff?: boolean; today?: boolean } };
+                    const isCleaning = mods.modifiers?.cleaning;
+                    const isTimeoff = mods.modifiers?.timeoff;
+                    const isToday = mods.modifiers?.today;
+                    const both = isCleaning && isTimeoff;
+                    const hasClosure = isCleaning || isTimeoff;
+                    const isInSelected = selectedTimeOffDates.some(d => d.getTime() === date.getTime());
                     return (
                       <CalendarDayButton
                         {...props}
                         title={title}
+                        style={both ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)' } : undefined}
                         className={cn(
                           props.className,
-                          "!rounded-xl",
-                          isCleaning && "!bg-[#2563eb] !text-white",
-                          isTimeoff && "!bg-[#f59e0b] !text-white"
+                          "!rounded-xl [&>span]:!opacity-100 font-semibold",
+                          hasClosure ? "!text-gray-900" : "",
+                          isToday && !hasClosure && "!text-green-600",
+                          isCleaning && !both && "!bg-[#60a5fa]",
+                          isTimeoff && !both && "!bg-[#fbbf24]",
+                          isInSelected && "!ring-2 !ring-orange-500 !ring-offset-2"
                         )}
                       />
                     );
                   }
                 }}
-                className="rounded-xl border w-full"
+                cellSize="1.5rem"
+                className="rounded-xl border w-full min-h-[280px]"
               />
               {/* Show scheduled closures list (all entries, scroll if many) */}
               {upcomingClosuresList.length > 0 && (
@@ -933,10 +968,10 @@ export default function AddPage() {
                   <div className="max-h-[220px] overflow-y-scroll overflow-x-hidden rounded-md border border-transparent pr-1" style={{ scrollbarGutter: 'stable' }}>
                     <div className="space-y-1.5 pr-1">
                   {upcomingClosuresList.map((entry) => {
-                    if ('ids' in entry && entry.ids) {
-                      const g = entry as CleaningGroup;
+                    if (entry.type === 'cleaning') {
+                      const g = entry;
                       return (
-                        <div key={`to-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
+                        <div key={`to-c-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
                           <span className="min-w-0 flex-1">{g.displayLoc}</span>
                           <span className="opacity-70 shrink-0">{g.dateRange}</span>
                           <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
@@ -945,19 +980,19 @@ export default function AddPage() {
                         </div>
                       );
                     }
-                    const c = entry as ClosureSchedule;
-                    const displayLoc = getClosureDisplayLocation(c);
-                    return (
-                      <div key={c.id} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
-                        <span className="min-w-0 flex-1">
-                          {displayLoc && c.foodItemName ? `${displayLoc} › ${c.foodItemName}` : c.foodItemName || displayLoc}
-                        </span>
-                        <span className="opacity-70 shrink-0">{c.date.split('-')[2]}/{c.date.split('-')[1]}</span>
-                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosure(c.id)} aria-label="Delete closure">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    );
+                    if (entry.type === 'timeoff') {
+                      const g = entry;
+                      return (
+                        <div key={`to-t-${g.dateRange}-${normalizeLocKey(g.displayLabel)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
+                          <span className="min-w-0 flex-1">{g.displayLabel}</span>
+                          <span className="opacity-70 shrink-0">{g.dateRange}</span>
+                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    }
+                    return null;
                   })}
                     </div>
                   </div>
@@ -973,10 +1008,10 @@ export default function AddPage() {
                     <div className="max-h-[220px] overflow-y-scroll overflow-x-hidden rounded-md border border-transparent pr-1" style={{ scrollbarGutter: 'stable' }}>
                       <div className="space-y-1.5 pr-1">
                     {pastClosuresList.map((entry) => {
-                      if ('ids' in entry && entry.ids) {
-                        const g = entry as CleaningGroup;
+                      if (entry.type === 'cleaning') {
+                        const g = entry;
                         return (
-                          <div key={`past-to-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
+                          <div key={`past-to-c-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
                             <span className="min-w-0 flex-1">{g.displayLoc}</span>
                             <span className="opacity-70 shrink-0">{g.dateRange}</span>
                             <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
@@ -985,19 +1020,19 @@ export default function AddPage() {
                           </div>
                         );
                       }
-                      const c = entry as ClosureSchedule;
-                      const displayLoc = getClosureDisplayLocation(c);
-                      return (
-                        <div key={c.id} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
-                          <span className="min-w-0 flex-1">
-                            {displayLoc && c.foodItemName ? `${displayLoc} › ${c.foodItemName}` : c.foodItemName || displayLoc}
-                          </span>
-                          <span className="opacity-70 shrink-0">{c.date.split('-')[2]}/{c.date.split('-')[1]}</span>
-                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosure(c.id)} aria-label="Delete closure">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      );
+                      if (entry.type === 'timeoff') {
+                        const g = entry;
+                        return (
+                          <div key={`past-to-t-${g.dateRange}-${normalizeLocKey(g.displayLabel)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
+                            <span className="min-w-0 flex-1">{g.displayLabel}</span>
+                            <span className="opacity-70 shrink-0">{g.dateRange}</span>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      }
+                      return null;
                     })}
                       </div>
                     </div>
@@ -1068,9 +1103,10 @@ export default function AddPage() {
                     onClick={async () => {
                       try {
                         // Use full location name from selected food item (not search query e.g. "GH")
-                        const fullLocation = selectedClosureFoodItem?.locations?.find(loc =>
+                        const rawLocation = selectedClosureFoodItem?.locations?.find(loc =>
                           loc.name.toLowerCase().includes(cleaningLocation.toLowerCase())
                         )?.name ?? cleaningLocation.trim();
+                        const fullLocation = capitalizeWords(rawLocation);
                         const schedules = selectedTimeOffDates.map(date => {
                           // Format as local date (YYYY-MM-DD) to avoid timezone shift
                           const year = date.getFullYear();
