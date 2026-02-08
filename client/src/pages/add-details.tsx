@@ -671,7 +671,7 @@ export default function AddPage() {
                         style={both ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)' } : undefined}
                         className={cn(
                           props.className,
-                          "!rounded-xl [&>span]:!opacity-100 font-semibold",
+                          "!rounded-xl [&>span]:!opacity-100",
                           hasClosure && "!text-white",
                           isToday && !hasClosure && "!text-green-600",
                           isCleaning && !both && "!bg-[#60a5fa]",
@@ -945,7 +945,7 @@ export default function AddPage() {
                         style={both ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)' } : undefined}
                         className={cn(
                           props.className,
-                          "!rounded-xl [&>span]:!opacity-100 font-semibold",
+                          "!rounded-xl [&>span]:!opacity-100",
                           hasClosure ? "!text-gray-900" : "",
                           isToday && !hasClosure && "!text-green-600",
                           isCleaning && !both && "!bg-[#60a5fa]",
