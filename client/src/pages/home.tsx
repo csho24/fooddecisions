@@ -40,19 +40,29 @@ export default function Home() {
       .catch(err => console.error('Failed to fetch closures:', err));
   }, []);
 
-  const closureBannerGroups = useMemo(() => {
+  const closureBannerLines = useMemo(() => {
     if (todaysClosures.length === 0) return [];
-    const byLocation = new Map<string, ClosureSchedule[]>();
+    const lines: { type: 'cleaning' | 'timeoff'; location: string; count?: number; foodItemName?: string }[] = [];
+    const cleaningByLocation = new Map<string, ClosureSchedule[]>();
+    const timeOffList: ClosureSchedule[] = [];
     for (const c of todaysClosures) {
-      const loc = c.location || c.foodItemName || 'Unknown';
-      if (!byLocation.has(loc)) byLocation.set(loc, []);
-      byLocation.get(loc)!.push(c);
+      if (c.type === 'cleaning') {
+        const loc = c.location || 'Unknown';
+        if (!cleaningByLocation.has(loc)) cleaningByLocation.set(loc, []);
+        cleaningByLocation.get(loc)!.push(c);
+      } else {
+        timeOffList.push(c);
+      }
     }
-    return Array.from(byLocation.entries()).map(([location, closures]) => ({
-      location,
-      isCleaning: closures.some(c => c.type === 'cleaning'),
-      count: closures.length
-    }));
+    cleaningByLocation.forEach((closures, location) => {
+      lines.push({ type: 'cleaning', location, count: closures.length });
+    });
+    timeOffList.forEach(c => {
+      const loc = c.location || 'Unknown';
+      const stallName = c.foodItemName || 'Stall';
+      lines.push({ type: 'timeoff', location: loc, foodItemName: stallName });
+    });
+    return lines;
   }, [todaysClosures]);
 
   return (
@@ -75,8 +85,8 @@ export default function Home() {
           animate="show"
           className="grid gap-4 flex-1"
         >
-          {/* Closure Alert Banner — one line per location: "9 Margaret Drive Stalls closed today" */}
-          {closureBannerGroups.length > 0 && (
+          {/* Closure Alert Banner — cleaning: "X location stall(s) closed today"; time off: "location — exact stall name closed today" */}
+          {closureBannerLines.length > 0 && (
             <motion.div 
               variants={item}
               className="bg-muted/50 border border-border rounded-2xl p-4 flex items-start gap-3"
@@ -87,9 +97,11 @@ export default function Home() {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-foreground text-sm mb-1">Closed Today</p>
                 <div className="space-y-1">
-                  {closureBannerGroups.map((g, i) => (
-                    <p key={i} className={g.isCleaning ? "text-blue-700 text-sm" : "text-amber-700 text-sm"}>
-                      {g.count} {g.location} stall{g.count !== 1 ? 's' : ''} closed today
+                  {closureBannerLines.map((line, i) => (
+                    <p key={i} className={line.type === 'cleaning' ? "text-blue-700 text-sm" : "text-amber-700 text-sm"}>
+                      {line.type === 'cleaning'
+                        ? `${line.count} ${line.location} stall${line.count !== 1 ? 's' : ''} closed today`
+                        : `${line.location} — ${line.foodItemName} closed today`}
                     </p>
                   ))}
                 </div>
