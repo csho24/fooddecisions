@@ -51,7 +51,24 @@ const quickAddSchema = z.object({
 
 export default function ListPage() {
   const { items, archivedItems, removeItem, checkAvailability, addItem, archiveItem, deleteArchivedItem } = useFoodStore();
-  const { saveLocation, getFilteredLocations } = useSavedLocations();
+
+  // Extract all unique non-blank location names from store items so suggestions always reflect the database
+  const storeLocations = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const item of items) {
+      if (item.type !== 'out') continue;
+      for (const loc of (item.locations || [])) {
+        const key = loc.name?.trim().toLowerCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        result.push(loc.name.trim());
+      }
+    }
+    return result;
+  }, [items]);
+
+  const { saveLocation, getFilteredLocations } = useSavedLocations(storeLocations);
   const [location, setLocation] = useLocation();
   const [filter, setFilter] = useState<'home' | 'out'>(() => {
     // Check URL params first, then sessionStorage
@@ -68,7 +85,16 @@ export default function ListPage() {
   const [showEatenStats, setShowEatenStats] = useState(false);
   const [locationQuery, setLocationQuery] = useState("");
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [highlightedLocationIndex, setHighlightedLocationIndex] = useState(-1);
+  const highlightedLocationIndexRef = useRef(-1);
+  const locationSuggestionsRef = useRef<string[]>([]);
   const locationInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep ref in sync so onKeyDown closures always see the current value
+  const setHighlightIdx = (i: number) => {
+    highlightedLocationIndexRef.current = i;
+    setHighlightedLocationIndex(i);
+  };
 
   const filteredItems = items.filter(item => item.type === filter);
   
@@ -356,42 +382,71 @@ export default function ListPage() {
                                   field.onChange(e);
                                   setLocationQuery(e.target.value);
                                   setShowLocationSuggestions(true);
+                                  setHighlightIdx(-1);
                                 }}
                                 onFocus={() => setShowLocationSuggestions(true)}
                                 onBlur={(e) => {
-                                  // Capitalize on blur
                                   const capitalized = capitalizeWords(e.target.value);
                                   field.onChange(capitalized);
                                   setLocationQuery(capitalized);
-                                  // Delay hiding to allow clicks on suggestions
                                   setTimeout(() => setShowLocationSuggestions(false), 200);
+                                }}
+                                onKeyDown={(e) => {
+                                  const suggestions = locationSuggestionsRef.current;
+                                  if (!suggestions.length) return;
+                                  if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    setHighlightIdx(Math.min(highlightedLocationIndexRef.current + 1, suggestions.length - 1));
+                                  } else if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    setHighlightIdx(Math.max(highlightedLocationIndexRef.current - 1, 0));
+                                  } else if ((e.key === 'Enter' || e.key === 'Tab') && highlightedLocationIndexRef.current >= 0) {
+                                    e.preventDefault();
+                                    const selected = suggestions[highlightedLocationIndexRef.current];
+                                    // Use field.onChange directly — calling blur() afterwards would cause
+                                    // onBlur to read the stale DOM value and overwrite the selection
+                                    field.onChange(selected);
+                                    setLocationQuery(selected);
+                                    setShowLocationSuggestions(false);
+                                    setHighlightIdx(-1);
+                                  } else if (e.key === 'Escape') {
+                                    setShowLocationSuggestions(false);
+                                    setHighlightIdx(-1);
+                                  }
                                 }}
                               />
                               <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                             </div>
                           </FormControl>
-                          {showLocationSuggestions && locationSuggestions.length > 0 && (
-                            <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                              {locationSuggestions.map((loc) => (
-                                <button
-                                  key={loc}
-                                  type="button"
-                                  className="w-full text-left px-4 py-3 hover:bg-accent transition-colors first:rounded-t-xl last:rounded-b-xl"
-                                  onClick={() => {
-                                    form.setValue('location', loc);
-                                    setLocationQuery(loc);
-                                    setShowLocationSuggestions(false);
-                                    locationInputRef.current?.blur();
-                                  }}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                                    <span>{loc}</span>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                          {showLocationSuggestions && locationSuggestions.length > 0 && (() => {
+                            locationSuggestionsRef.current = locationSuggestions;
+                            return (
+                              <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                {locationSuggestions.map((loc, idx) => (
+                                  <button
+                                    key={loc}
+                                    type="button"
+                                    className={cn(
+                                      "w-full text-left px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl",
+                                      idx === highlightedLocationIndex ? "bg-accent" : "hover:bg-accent"
+                                    )}
+                                    onClick={() => {
+                                      form.setValue('location', loc);
+                                      setLocationQuery(loc);
+                                      setShowLocationSuggestions(false);
+                                      setHighlightIdx(-1);
+                                      locationInputRef.current?.blur();
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                                      <span>{loc}</span>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
                           <FormMessage />
                         </FormItem>
                       )}

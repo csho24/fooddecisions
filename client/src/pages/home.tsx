@@ -148,8 +148,8 @@ export default function Home() {
                   {regularClosuresToday.map((entry, i) => (
                     <p key={`reg-${i}`} className="text-muted-foreground text-sm">
                       {entry.locationName
-                        ? `${entry.stallName} (${entry.locationName}) is closed today`
-                        : `${entry.stallName} is closed today`}
+                        ? `${entry.stallName} (${entry.locationName})`
+                        : entry.stallName}
                     </p>
                   ))}
                 </div>

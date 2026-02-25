@@ -673,6 +673,20 @@ All fixes tested and working as expected. No known issues remaining from today's
 
 ---
 
+## Location Suggestion Keyboard Selection — February 2026
+
+**Problem:** After adding a suggestions dropdown to the location input (Quick Add in Food List, and Add Details), pressing Enter or Tab after highlighting a suggestion with the arrow keys did not fill the input with the selected location.
+
+**What was missed on first attempts:**
+
+1. **Stale closure** — The first fix tried using React state (`highlightedIndex`) inside the `onKeyDown` handler. Because React state updates are async, pressing ArrowDown then Enter quickly meant the Enter handler still saw the old state value (`-1`), so the condition `highlightedIndex >= 0` was never true. Fix was to mirror the index into a `useRef` that updates synchronously alongside state.
+
+2. **`onBlur` overwriting the selection** — The second attempt called `form.setValue('location', selected)` then `locationInputRef.current?.blur()`. The `onBlur` handler fires synchronously when `blur()` is called, and reads `e.target.value` from the actual DOM — which is still the old typed text ("emp") because React hasn't re-rendered yet. It then calls `field.onChange("Emp")`, silently overwriting "Empress Place". Fix was to call `field.onChange(selected)` directly (bypassing the DOM) and not call `blur()` at all — the dropdown just closes and focus stays in the field.
+
+**Files changed:** `client/src/pages/list.tsx`, `client/src/pages/add-details.tsx`
+
+---
+
 ## Related Documentation
 
 - [Architecture & Design Patterns](./Architecture_and_Patterns.md) - How the website works

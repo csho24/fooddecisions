@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn, capitalizeWords } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSavedLocations } from "@/hooks/use-saved-locations";
 import { Search, ChevronDown, Home, Utensils, Clock, Plus, MapPin, X, Trash2, Calendar as CalendarIcon, Sparkles } from "lucide-react";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
@@ -74,7 +74,24 @@ const HOME_CATEGORIES = [
 
 export default function AddPage() {
   const { items, addItem, updateItem, removeItem } = useFoodStore();
-  const { saveLocation: saveLocationToHistory } = useSavedLocations();
+
+  // Extract all unique non-blank location names from store items for suggestions
+  const storeLocations = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const item of items) {
+      if (item.type !== 'out') continue;
+      for (const loc of (item.locations || [])) {
+        const key = loc.name?.trim().toLowerCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        result.push(loc.name.trim());
+      }
+    }
+    return result;
+  }, [items]);
+
+  const { saveLocation: saveLocationToHistory, getFilteredLocations } = useSavedLocations(storeLocations);
   const { toast } = useToast();
   const [_, setLocation] = useLocation();
   const searchString = useSearch();
@@ -344,6 +361,19 @@ export default function AddPage() {
   // Delete Confirmation State
   const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
 
+  // Location name autocomplete state
+  const [locationNameQuery, setLocationNameQuery] = useState("");
+  const [showLocationNameSuggestions, setShowLocationNameSuggestions] = useState(false);
+  const [highlightedLocationNameIndex, setHighlightedLocationNameIndex] = useState(-1);
+  const highlightedLocationNameIndexRef = useRef(-1);
+  const locationNameSuggestionsRef = useRef<string[]>([]);
+  const locationNameInputRef = useRef<HTMLInputElement>(null);
+
+  const setHighlightLocationNameIdx = (i: number) => {
+    highlightedLocationNameIndexRef.current = i;
+    setHighlightedLocationNameIndex(i);
+  };
+
   // Handle deep linking via ID - only set selectedItem when ID changes, not on every items update
   useEffect(() => {
     const params = new URLSearchParams(searchString);
@@ -455,6 +485,8 @@ export default function AddPage() {
       closedDays: [],
       notes: "",
     });
+    setLocationNameQuery("");
+    setShowLocationNameSuggestions(false);
     setIsHoursOpen(false);
     setIsLocationDialogOpen(true);
   }
@@ -1756,16 +1788,85 @@ export default function AddPage() {
             <div className="py-4 space-y-4">
                 <div className="space-y-2">
                     <Label>Location</Label>
-                    <Input 
-                        value={locationForm.watch('name')} 
-                        onChange={(e) => locationForm.setValue('name', e.target.value)}
-                        onBlur={(e) => {
-                          const capitalized = capitalizeWords(e.target.value);
-                          locationForm.setValue('name', capitalized);
-                        }}
-                        placeholder="e.g. Maxwell or Bedok"
-                        className="h-12 rounded-xl bg-muted/30"
-                    />
+                    <div className="relative">
+                      {(() => {
+                        const locationNameSuggestions = getFilteredLocations(locationNameQuery);
+                        return (
+                          <>
+                            <Input
+                                ref={locationNameInputRef}
+                                value={locationForm.watch('name')}
+                                onChange={(e) => {
+                                  locationForm.setValue('name', e.target.value);
+                                  setLocationNameQuery(e.target.value);
+                                  setShowLocationNameSuggestions(true);
+                                  setHighlightedLocationNameIndex(-1);
+                                }}
+                                onFocus={() => setShowLocationNameSuggestions(true)}
+                                onBlur={(e) => {
+                                  const capitalized = capitalizeWords(e.target.value);
+                                  locationForm.setValue('name', capitalized);
+                                  setLocationNameQuery(capitalized);
+                                  setTimeout(() => setShowLocationNameSuggestions(false), 200);
+                                }}
+                                onKeyDown={(e) => {
+                                  const suggestions = locationNameSuggestionsRef.current;
+                                  if (!suggestions.length) return;
+                                  if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    setHighlightLocationNameIdx(Math.min(highlightedLocationNameIndexRef.current + 1, suggestions.length - 1));
+                                  } else if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    setHighlightLocationNameIdx(Math.max(highlightedLocationNameIndexRef.current - 1, 0));
+                                  } else if ((e.key === 'Enter' || e.key === 'Tab') && highlightedLocationNameIndexRef.current >= 0) {
+                                    e.preventDefault();
+                                    const selected = suggestions[highlightedLocationNameIndexRef.current];
+                                    locationForm.setValue('name', selected);
+                                    setLocationNameQuery(selected);
+                                    setShowLocationNameSuggestions(false);
+                                    setHighlightLocationNameIdx(-1);
+                                  } else if (e.key === 'Escape') {
+                                    setShowLocationNameSuggestions(false);
+                                    setHighlightLocationNameIdx(-1);
+                                  }
+                                }}
+                                placeholder="e.g. Maxwell or Bedok"
+                                className="h-12 rounded-xl bg-muted/30"
+                            />
+                            {showLocationNameSuggestions && locationNameSuggestions.length > 0 && (() => {
+                              locationNameSuggestionsRef.current = locationNameSuggestions;
+                              return (
+                                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                  {locationNameSuggestions.map((loc, idx) => (
+                                    <button
+                                      key={loc}
+                                      type="button"
+                                      className={cn(
+                                        "w-full text-left px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl",
+                                        idx === highlightedLocationNameIndex ? "bg-accent" : "hover:bg-accent"
+                                      )}
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        locationForm.setValue('name', loc);
+                                        setLocationNameQuery(loc);
+                                        setShowLocationNameSuggestions(false);
+                                        setHighlightLocationNameIdx(-1);
+                                        locationNameInputRef.current?.blur();
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                                        <span>{loc}</span>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </>
+                        );
+                      })()}
+                    </div>
                 </div>
                 
                 {/* Notes field removed as requested */}

@@ -83,7 +83,8 @@ export default function Decide() {
       .forEach(item => {
         if (item.locations && item.locations.length > 0) {
           item.locations.forEach(loc => {
-            const normalizedKey = loc.name.trim().toLowerCase();
+            const normalizedKey = loc.name?.trim().toLowerCase();
+            if (!normalizedKey) return; // skip blank location names
             const displayName = loc.name.trim();
             // Keep the first occurrence's capitalization
             if (!locationMap.has(normalizedKey)) {
@@ -517,6 +518,11 @@ export default function Decide() {
                                               {loc.openingHours.open} - {loc.openingHours.close}
                                             </div>
                                           )}
+                                          {loc.closedDays && loc.closedDays.length > 0 && (
+                                            <div className="text-sm text-muted-foreground mt-1">
+                                              Closed {loc.closedDays.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
@@ -620,6 +626,11 @@ export default function Decide() {
                                             <div className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
                                               <Clock size={12} />
                                               {loc.openingHours.open} - {loc.openingHours.close}
+                                            </div>
+                                          )}
+                                          {loc.closedDays && loc.closedDays.length > 0 && (
+                                            <div className="text-sm text-muted-foreground mt-1">
+                                              Closed {loc.closedDays.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}
                                             </div>
                                           )}
                                         </div>
