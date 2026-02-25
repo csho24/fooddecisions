@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getClosureSchedules, ClosureSchedule } from '../api';
+import { getClosureSchedules, ClosureSchedule, getFoods } from '../api';
+import { FoodItem } from '../types';
 
 interface HomeScreenProps {
   navigation: any;
 }
 
+interface RegularClosure {
+  stallName: string;
+  locationName: string | null;
+}
+
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [todaysClosures, setTodaysClosures] = useState<ClosureSchedule[]>([]);
+  const [regularClosuresToday, setRegularClosuresToday] = useState<RegularClosure[]>([]);
 
   useEffect(() => {
-    // Fetch closures and filter for today
+    // Fetch scheduled closures and filter for today
     getClosureSchedules()
       .then(closures => {
         const today = new Date();
@@ -24,6 +31,40 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         setTodaysClosures(todayClosures);
       })
       .catch(err => console.error('Failed to fetch closures:', err));
+
+    // Fetch food items and compute regular weekly closures
+    getFoods()
+      .then((items: FoodItem[]) => {
+        const todayDow = new Date().getDay(); // 0=Sunday, 1=Monday, ...
+        const result: RegularClosure[] = [];
+
+        for (const item of items) {
+          if (item.type !== 'out') continue;
+
+          if (item.locations && item.locations.length > 0) {
+            const closedLocs = item.locations.filter(loc => {
+              if (!loc.closedDays || !loc.closedDays.includes(todayDow)) return false;
+              // Skip locations closed more than 5 days/week (reminder-only items like a Sunday church café)
+              return loc.closedDays.length <= 5;
+            });
+            if (closedLocs.length === 0) continue;
+
+            if (closedLocs.length === item.locations.length || item.locations.length === 1) {
+              result.push({ stallName: item.name, locationName: null });
+            } else {
+              for (const loc of closedLocs) {
+                result.push({ stallName: item.name, locationName: loc.name });
+              }
+            }
+          } else if (item.closedDays && item.closedDays.includes(todayDow) && item.closedDays.length <= 5) {
+            // Legacy: closedDays directly on item — skip reminder-only items closed 6+ days/week
+            result.push({ stallName: item.name, locationName: null });
+          }
+        }
+
+        setRegularClosuresToday(result);
+      })
+      .catch(err => console.error('Failed to fetch foods for closure check:', err));
   }, []);
 
   return (
@@ -38,7 +79,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
       <View style={styles.buttonsContainer}>
         {/* Closure Alert Banner */}
-        {todaysClosures.length > 0 && (
+        {(todaysClosures.length > 0 || regularClosuresToday.length > 0) && (
           <View style={styles.closureBanner}>
             <View style={styles.closureBannerIcon}>
               <Ionicons name="alert-circle" size={18} color="#D97706" />
@@ -53,6 +94,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                   <Text style={styles.closureBannerType}>
                     {' '}({c.type === 'cleaning' ? 'Cleaning' : 'Time Off'})
                   </Text>
+                </Text>
+              ))}
+              {regularClosuresToday.map((entry, i) => (
+                <Text key={`reg-${i}`} style={styles.closureBannerRegular}>
+                  {entry.locationName
+                    ? `${entry.stallName} (${entry.locationName}) is closed today`
+                    : `${entry.stallName} is closed today`}
                 </Text>
               ))}
             </View>
@@ -278,5 +326,9 @@ const styles = StyleSheet.create({
   closureBannerType: {
     fontSize: 12,
     color: '#D97706',
+  },
+  closureBannerRegular: {
+    fontSize: 14,
+    color: '#6B7280',
   },
 });

@@ -17,7 +17,10 @@ You add items (name, Home or Out, and for Out a location) via **Quick Add** on t
 - **Decide** — “Help me choose what to eat” → takes you to the Decide flow (pick Home or Out, then choose something).
 - **Food List** — Your lists: Home (fridge/snacks) and Out (eateries/stalls). Quick Add and all item management live here.
 - **Add Info** — Closure schedules (when stalls are closed for cleaning or time off), expiry dates for home items, and editing an item’s details (name, category, locations, opening hours, closed days).
-- If any stall is **closed today** (from closure schedules), a banner appears at the top (e.g. “1 Ghim Moh stall closed today”).
+- If any stall is **closed today**, a banner appears at the top. This covers two sources:
+  - **Scheduled closures** (cleaning / time off) entered via Add Info — shown in amber/blue.
+  - **Regular weekly closures** based on a stall’s `closedDays` setting — shown in grey (e.g. “Gimmo Dock is closed today”).
+- **Frequency filter:** A stall only appears in the regular-closure banner if it is closed on **5 or fewer days per week**. Items closed 6+ days a week (e.g. a church café only open on Sundays) are treated as “reminder only” entries — they still appear in Decide suggestions but never clutter the banner.
 
 ---
 

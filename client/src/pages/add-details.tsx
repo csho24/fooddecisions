@@ -757,11 +757,18 @@ export default function AddPage() {
                         : undefined);
                     const isAlreadySaved = isDateSaved(date, 'cleaning');
                     const isInSelected = selectedCleaningDates.some(d => d.getTime() === date.getTime());
+                    // Both cleaning+timeoff: half blue, half orange. Note: 50% gradient can show a sliver of orange at the edge; future fix could use two divs or 49%/51% for a crisper split.
+                    const dayStyle =
+                      both
+                        ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)', opacity: 1 }
+                        : isToday && (isCleaning || isTimeoff)
+                          ? { ...(typeof props.style === 'object' && props.style ? props.style : {}), color: '#14532d', opacity: 1 }
+                          : props.style;
                     return (
                       <CalendarDayButton
                         {...props}
                         title={title}
-                        style={both ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)', opacity: 1 } : undefined}
+                        style={dayStyle}
                         onClick={(e) => {
                           // If date is already saved but not in selectedCleaningDates, add it so user can add another location
                           if (isAlreadySaved && !isInSelected && !isDateSaved(date, 'timeoff')) {
@@ -778,7 +785,7 @@ export default function AddPage() {
                           isTimeoff && !both && "!bg-[#f59e0b] !text-black",
                           isInSelected && "!ring-2 !ring-orange-500 !ring-offset-2",
                           isToday && !isCleaning && !isTimeoff && "!text-green-600 !font-bold !text-base",
-                          isToday && (isCleaning || isTimeoff) && "!font-bold !text-base"
+                          isToday && (isCleaning || isTimeoff) && "!text-green-900 [&>span]:!text-green-900 !font-bold !text-base"
                         )}
                       />
                     );
@@ -1174,11 +1181,18 @@ export default function AddPage() {
                     const isTimeoff = mods.modifiers?.timeoff;
                     const isToday = mods.modifiers?.today;
                     const both = isCleaning && isTimeoff;
+                    // Both cleaning+timeoff: half blue, half orange. Note: 50% gradient can show a sliver of orange at the edge; future fix could use two divs or 49%/51% for a crisper split.
+                    const dayStyle =
+                      both
+                        ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)', opacity: 1 }
+                        : isToday && (isCleaning || isTimeoff)
+                          ? { ...(typeof props.style === 'object' && props.style ? props.style : {}), color: '#14532d', opacity: 1 }
+                          : props.style;
                     return (
                       <CalendarDayButton
                         {...props}
                         title={title}
-                        style={both ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)', opacity: 1 } : undefined}
+                        style={dayStyle}
                         className={cn(
                           props.className,
                           "!rounded-xl [&>span]:!opacity-100",
@@ -1186,7 +1200,7 @@ export default function AddPage() {
                           isCleaning && !both && "!bg-[#60a5fa] !text-black",
                           isTimeoff && !both && "!bg-[#f59e0b] !text-black",
                           isToday && !isCleaning && !isTimeoff && "!text-green-600 !font-bold !text-base",
-                          isToday && (isCleaning || isTimeoff) && "!font-bold !text-base"
+                          isToday && (isCleaning || isTimeoff) && "!text-green-900 [&>span]:!text-green-900 !font-bold !text-base"
                         )}
                       />
                     );

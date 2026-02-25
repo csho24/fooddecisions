@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { Utensils, List, Plus, ChefHat, Store, AlertCircle } from "lucide-react";
 import bgPattern from "@assets/generated_images/subtle_abstract_food_pattern_background.png";
 import { useEffect, useMemo, useState } from "react";
-import { getClosureSchedules, ClosureSchedule } from "@/lib/api";
+import { getClosureSchedules, ClosureSchedule, getFoods } from "@/lib/api";
+import type { FoodItem } from "@/lib/store";
 
 const container = {
   hidden: { opacity: 0 },
@@ -21,11 +22,17 @@ const item = {
   show: { y: 0, opacity: 1 }
 };
 
+interface RegularClosure {
+  stallName: string;
+  locationName: string | null;
+}
+
 export default function Home() {
   const [todaysClosures, setTodaysClosures] = useState<ClosureSchedule[]>([]);
+  const [regularClosuresToday, setRegularClosuresToday] = useState<RegularClosure[]>([]);
 
   useEffect(() => {
-    // Fetch closures and filter for today
+    // Fetch scheduled closures and filter for today
     getClosureSchedules()
       .then(closures => {
         const today = new Date();
@@ -38,6 +45,40 @@ export default function Home() {
         setTodaysClosures(todayClosures);
       })
       .catch(err => console.error('Failed to fetch closures:', err));
+
+    // Fetch food items and compute regular weekly closures
+    getFoods()
+      .then((items: FoodItem[]) => {
+        const todayDow = new Date().getDay(); // 0=Sunday, 1=Monday, ...
+        const result: RegularClosure[] = [];
+
+        for (const item of items) {
+          if (item.type !== 'out') continue;
+
+          if (item.locations && item.locations.length > 0) {
+            const closedLocs = item.locations.filter(loc => {
+              if (!loc.closedDays || !loc.closedDays.includes(todayDow)) return false;
+              // Skip locations closed more than 5 days/week (reminder-only items like a Sunday church café)
+              return loc.closedDays.length <= 5;
+            });
+            if (closedLocs.length === 0) continue;
+
+            if (closedLocs.length === item.locations.length || item.locations.length === 1) {
+              result.push({ stallName: item.name, locationName: null });
+            } else {
+              for (const loc of closedLocs) {
+                result.push({ stallName: item.name, locationName: loc.name });
+              }
+            }
+          } else if (item.closedDays && item.closedDays.includes(todayDow) && item.closedDays.length <= 5) {
+            // Legacy: closedDays directly on item — skip reminder-only items closed 6+ days/week
+            result.push({ stallName: item.name, locationName: null });
+          }
+        }
+
+        setRegularClosuresToday(result);
+      })
+      .catch(err => console.error('Failed to fetch foods for closure check:', err));
   }, []);
 
   const closureBannerLines = useMemo(() => {
@@ -85,8 +126,8 @@ export default function Home() {
           animate="show"
           className="grid gap-4 flex-1"
         >
-          {/* Closure Alert Banner — cleaning: "X location stall(s) closed today"; time off: "location — exact stall name closed today" */}
-          {closureBannerLines.length > 0 && (
+          {/* Closure Alert Banner */}
+          {(closureBannerLines.length > 0 || regularClosuresToday.length > 0) && (
             <motion.div 
               variants={item}
               className="bg-muted/50 border border-border rounded-2xl p-4 flex items-start gap-3"
@@ -102,6 +143,13 @@ export default function Home() {
                       {line.type === 'cleaning'
                         ? `${line.count} ${line.location} stall${line.count !== 1 ? 's' : ''} closed today`
                         : `${line.location} — ${line.foodItemName} closed today`}
+                    </p>
+                  ))}
+                  {regularClosuresToday.map((entry, i) => (
+                    <p key={`reg-${i}`} className="text-muted-foreground text-sm">
+                      {entry.locationName
+                        ? `${entry.stallName} (${entry.locationName}) is closed today`
+                        : `${entry.stallName} is closed today`}
                     </p>
                   ))}
                 </div>

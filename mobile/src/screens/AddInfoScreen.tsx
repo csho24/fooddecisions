@@ -850,6 +850,7 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
                 const isSavedOther = isDateSaved(date, otherType);
                 const isSelected = isDateSelected(date);
                 const closure = getClosureForDate(date);
+                const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
 
                 return (
                   <TouchableOpacity
@@ -869,6 +870,7 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
                       isSelected && styles.dayTextSelected,
                       (isSavedCurrent || isSavedOther) && styles.dayTextSaved,
                       isPast && styles.dayTextDisabled,
+                      isToday && styles.dayTextToday,
                     ]}>
                       {date.getDate()}
                     </Text>
@@ -1708,6 +1710,11 @@ const styles = StyleSheet.create({
   },
   dayTextDisabled: {
     color: '#9CA3AF',
+  },
+  dayTextToday: {
+    color: '#15803D',
+    fontWeight: '700',
+    fontSize: 16,
   },
   closuresList: {
     marginTop: 16,

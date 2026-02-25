@@ -4,6 +4,43 @@ This document tracks specific problems encountered and their solutions.
 
 ---
 
+# January 19, 2026 - Pointy corners on “today” (e.g. day 10), greener today on blocks, half-block note
+
+**Date:** January 19, 2026  
+**Status:** Pointy corners ✅; today-on-closure green and opacity ✅; half-half gradient sliver noted for future
+
+---
+
+## What was done
+
+### 1. Pointy corners on today (e.g. day 10)
+
+**Problem:** When a day was both **today** and had a closure (cleaning/time off or both), that day had **sharp (pointy) corners** while other days with the same shading had rounded corners (e.g. day 9 rounded, day 10 pointy when day 10 was today).
+
+**Root cause:** The calendar’s `today` modifier in `client/src/components/ui/calendar.tsx` used `data-[selected=true]:rounded-none`. When today was also “selected” (e.g. has a closure modifier), the day cell got `rounded-none`, so it looked angular.
+
+**Fix:** In `calendar.tsx`, the `today` class was changed from  
+`"rounded-md data-[selected=true]:rounded-none"`  
+to  
+`"rounded-xl"`  
+so today always uses rounded corners and no longer gets sharp edges when it has a closure.
+
+### 2. Other changes this session (today + closure display)
+
+- **Darker green for today on closure blocks:** Today’s number on blue/amber blocks was updated to a darker green (`#14532d` / green-900) and the day cell is forced to `opacity: 1` when it’s today with a closure, so the number doesn’t look faded (modifiersStyles had been applying `opacity: 0.8` to the whole cell).
+- **Range-middle corners:** So that “middle” days in a range don’t look pointy, `range_middle` was changed from `rounded-none` to `rounded-xl` in both the root classNames and in `CalendarDayButton` (`data-[range-middle=true]:!rounded-xl`).
+
+### 3. Half-half gradient (blue/orange) – noted for future
+
+**Observation:** When a day has both cleaning and time off (half blue, half orange), the 50% gradient can show a **sliver of orange at the edge** (not a perfectly crisp split). A short in-code comment was added in `add-details.tsx` next to the gradient so we remember to try a future fix (e.g. two divs or 49%/51% for a crisper edge). No code change for the gradient itself in this session.
+
+## Files changed (19 Jan 2026)
+
+- `client/src/components/ui/calendar.tsx` – `today` modifier: always `rounded-xl` (no `rounded-none` when selected); `range_middle` uses `rounded-xl` in root and in DayButton.
+- `client/src/pages/add-details.tsx` – Today + closure: darker green (`#14532d`), `opacity: 1` in dayStyle, `!text-green-900` / `[&>span]:!text-green-900`; comment added for half-half gradient sliver (future fix).
+
+---
+
 # February 8, 2026 - Closure calendar: today styling, spacing attempts, blue border
 
 **Date:** February 8, 2026  
