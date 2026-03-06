@@ -4,6 +4,181 @@ This document tracks specific problems encountered and their solutions.
 
 ---
 
+# March 6, 2026 — Time Off calendar parity, broken date ranges, cross-month display
+
+**Date:** March 6, 2026  
+**Status:** ✅ All issues resolved
+
+---
+
+## Background
+
+User was trying to mark Mushroom Noodles (Ghim Moh) as closed from 9 Mar to 9 Apr. Several things went wrong, traced to a core design misunderstanding plus missing parity between the cleaning and time-off calendars.
+
+---
+
+## Issue 1: Time-off date range broken into 3 separate segments
+
+### Problem
+Selecting 9 Mar–9 Apr showed up in the scheduled closures list as three separate entries:
+- 9–15 Mar
+- 18–22 Mar
+- 25 Mar–9 Apr
+
+### Root Cause
+Cleaning days (16–17 Mar, 23–24 Mar) fell within the time-off range. The time-off calendar had `disabled={(date) => isDateSaved(date, 'cleaning')}`, so those dates could not be selected. The `onSelect` filter also stripped cleaning dates out: `dates.filter(d => !isDateSaved(d, 'timeoff') && !isDateSaved(d, 'cleaning'))`. This left gaps in the saved chain. When `mergeConsecutiveDates` built the display ranges, the gaps broke the range into 3 parts.
+
+### Root Misunderstanding
+The original design treated cleaning and time-off as mutually exclusive — cleaning dates were disabled in the time-off calendar and vice versa. But they are **independent events**: a stall being on time-off does not prevent the hawker centre from doing cleaning on those same days. The two can and should overlap.
+
+### Fix
+- Removed `disabled={(date) => isDateSaved(date, 'cleaning')}` from the time-off calendar entirely.
+- Changed `onSelect` filter to only exclude already-saved timeoff dates: `dates.filter(d => !isDateSaved(d, 'timeoff'))`.
+- Cleaning dates within a time-off range now save as both types and display with the half-blue/half-amber split colour (which already existed in code but was unreachable — see Issue 3).
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 2: No visual feedback when clicking blue (cleaning) dates in time-off calendar
+
+### Problem
+Clicking a blue cleaning date in the time-off calendar did nothing visible — no colour change, no ring, no indication whether the date was being included or not.
+
+### Root Cause
+Same as Issue 1 — the dates were `disabled`, so all click events were completely suppressed by the calendar component.
+
+### Fix
+Removing the `disabled` prop (from Issue 1 fix) also fixed this — cleaning dates are now clickable and show the split half-half colour when selected for time-off.
+
+---
+
+## Issue 3: Half-half split colour was dead code
+
+### Problem
+The half-blue/half-amber gradient style existed in the time-off DayButton (and the cleaning DayButton), but never actually appeared on screen.
+
+### Root Cause
+The gradient triggers when `both = isCleaning && isTimeoff` is true. In the time-off calendar, `isCleaning` comes from `modifiers.cleaning` (saved cleaning dates), and `isTimeoff` comes from `modifiers.timeoff` (saved + selected timeoff dates). But since cleaning dates were disabled and filtered out, a date could never be in both modifiers at the same time. The gradient was unreachable.
+
+### Fix
+Once the `disabled` constraint and `onSelect` filter were removed (Issue 1), selecting a cleaning date for time-off sets both modifiers to true, and the split colour now works as intended.
+
+---
+
+## Issue 4: Time-off calendar missing parity with cleaning calendar
+
+### Problem
+User explicitly stated both calendars should "work the same way." The time-off calendar was missing three features that the cleaning calendar had:
+
+1. **Selected count text** — Cleaning showed "X days closed" below the calendar as dates were picked. Time-off showed nothing.
+2. **Orange ring on selected dates** — Cleaning dates got an orange ring (`!ring-2 !ring-orange-500`) when freshly selected. Time-off had no such indicator.
+3. **Re-clicking saved dates** — Cleaning calendar had a custom `onClick` handler so clicking a saved (blue) date would re-add it to selection (ring appears) for adding another location. Time-off had no equivalent, so clicking a saved (amber) date did nothing.
+
+### Fix
+- Added `isInSelected` and `isAlreadySaved` variables to the time-off DayButton, matching the cleaning calendar exactly.
+- Added orange ring class: `isInSelected && "!ring-2 !ring-orange-500 !ring-offset-2"`.
+- Added custom `onClick` handler for saved timeoff dates.
+- Added the "X days closed" count paragraph inside the `selectedTimeOffDates.length > 0` block.
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 5: Clicking saved orange (timeoff) dates still showed no reaction after initial fix
+
+### Problem
+After the parity fix above was applied, clicking already-saved orange dates in the time-off calendar still produced no ring or visual response.
+
+### Root Cause
+A second filter was undoing the fix. In `onSelect`, the filter `dates.filter(d => !isDateSaved(d, 'timeoff'))` stripped saved timeoff dates back out immediately after the calendar added them. The custom `onClick` tried to add them to `selectedTimeOffDates`, but `onSelect` ran right after and wiped them out.
+
+### Fix
+Removed `!isDateSaved(d, 'timeoff')` from the `onSelect` filter entirely. The calendar now accepts all dates from its toggle, including re-clicked saved dates. The `onSelect` only deduplicates (via `Map` by timestamp). Removed the now-redundant manual `setSelectedTimeOffDates` from the custom `onClick`.
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 6: Cross-month date range displayed incorrectly ("9–9 Mar" instead of "9 Mar–9 Apr")
+
+### Problem
+A date range spanning two months (e.g., 9 Mar to 9 Apr) showed as "9–9 Mar" in the scheduled closures list.
+
+### Root Cause
+`formatDateRange()` always used the start month (`m1`) for both the start and end day numbers:
+```typescript
+return `${d1}–${d2} ${MONTHS_SHORT[m1 - 1]}`; // Always used start month
+```
+When start and end were in different months, it ignored the end month entirely.
+
+### Fix
+Added a cross-month check:
+```typescript
+if (m1 === m2) return `${d1}–${d2} ${MONTHS_SHORT[m1 - 1]}`;
+return `${d1} ${MONTHS_SHORT[m1 - 1]}–${d2} ${MONTHS_SHORT[m2 - 1]}`;
+```
+Same-month ranges like "16–17 Mar" are unchanged.
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 7: Selected date count listed every individual date (too verbose)
+
+### Problem
+The "X days" counter below the calendar was listing every single selected date: "32 days — 9 Mar, 10 Mar, 11 Mar, 12 Mar...". This was too long and unnecessary.
+
+### Fix
+Changed both calendars (cleaning and time-off) to just say "X days closed" with no date list.
+
+### Files Changed
+- `client/src/pages/add-details.tsx`
+
+---
+
+## Issue 8: Calendar day blocks stuck together (finally fixed)
+
+### Problem
+Calendar day blocks appeared glued together with no visible gaps between them. This was raised multiple times across several sessions and was previously declared unsolvable.
+
+### Previous Attempts (Feb 8, 2026 — all failed)
+1. `border-spacing` on the `<table>` via classNames and MonthGrid inline style (`borderSpacing: "0.5rem"`)
+2. CSS override in `index.css` with `!important` targeting `.group/calendar table.rdp-month_grid`
+3. Cell padding `p-0.5` on the custom `<td>` Day component — this worked but caused a visible blue border artefact
+
+### Root Cause of Previous Failures
+All prior attempts targeted **table-layout** spacing properties (`border-spacing`, `border-collapse`). These only work when elements are laid out as a table. But the `<tr>` rows already have **`flex` display** applied via the `week` and `weekdays` classNames. The browser completely ignores table spacing on flex containers, so every attempt was targeting the wrong CSS layer.
+
+### Fix
+Added `gap-1` (4px) to both the weekday header row and the week rows in `calendar.tsx`:
+```typescript
+weekdays: cn("flex gap-1", defaultClassNames.weekdays),
+week: cn("mt-2 flex w-full gap-1", defaultClassNames.week),
+```
+`gap` is a flex property and works correctly here. Because both the header row and day rows use the same gap, all columns stay perfectly aligned.
+
+### Files Changed
+- `client/src/components/ui/calendar.tsx`
+
+---
+
+## Key Lesson
+
+**Cleaning and time-off are independent event types and can coexist on the same date.** Do not treat one as blocking the other. The original `disabled` constraint and mutual filter were based on the wrong assumption that "if a hawker centre is cleaning, a stall can't also be on time-off." They are tracked separately and displayed with a split colour when they overlap.
+
+---
+
+## Files Changed (6 Mar 2026)
+
+- `client/src/pages/add-details.tsx` — all changes above
+
+---
+
 # January 19, 2026 - Pointy corners on “today” (e.g. day 10), greener today on blocks, half-block note
 
 **Date:** January 19, 2026  

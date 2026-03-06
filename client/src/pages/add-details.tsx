@@ -232,9 +232,10 @@ export default function AddPage() {
   const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const formatDateRange = (start: string, end: string): string => {
     const [, m1, d1] = start.split('-').map(Number);
-    const [, m2, d2] = end.split('-').map(Number);
+    const [y2, m2, d2] = end.split('-').map(Number);
     if (start === end) return `${d1} ${MONTHS_SHORT[m1 - 1]}`;
-    return `${d1}–${d2} ${MONTHS_SHORT[m1 - 1]}`;
+    if (m1 === m2) return `${d1}–${d2} ${MONTHS_SHORT[m1 - 1]}`;
+    return `${d1} ${MONTHS_SHORT[m1 - 1]}–${d2} ${MONTHS_SHORT[m2 - 1]}`;
   };
   const mergeConsecutiveDates = (dateToIds: Map<string, number[]>): Array<{ dateRange: string; ids: number[] }> => {
     const sortedDates = Array.from(dateToIds.keys()).sort();
@@ -867,10 +868,7 @@ export default function AddPage() {
               {selectedCleaningDates.length > 0 && (
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground px-3">
-                    {selectedCleaningDates.length} day{selectedCleaningDates.length !== 1 ? 's' : ''} — {selectedCleaningDates.sort((a, b) => a.getTime() - b.getTime()).map(d => {
-                      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                      return `${d.getDate()} ${months[d.getMonth()]}`;
-                    }).join(', ')}
+                    {selectedCleaningDates.length} day{selectedCleaningDates.length !== 1 ? 's' : ''} closed
                   </p>
                   <div className="space-y-2 px-1">
                     <Label>Location (hawker centre / area)</Label>
@@ -1169,19 +1167,18 @@ export default function AddPage() {
               <h3 className="font-bold text-lg">Time Off</h3>
               <Calendar
                 mode="multiple"
-                selected={[...getSavedDatesForType('timeoff'), ...selectedTimeOffDates]}
+                selected={selectedTimeOffDates}
                 onSelect={(dates) => {
                   if (!dates) {
                     setSelectedTimeOffDates([]);
                     return;
                   }
-                  // Filter out saved dates (both types) - only keep newly selected ones
-                  const newDates = dates.filter(d => 
-                    !isDateSaved(d, 'timeoff') && !isDateSaved(d, 'cleaning')
-                  );
-                  setSelectedTimeOffDates(newDates);
+                  // Accept all dates from the calendar toggle, including re-clicks on saved
+                  // timeoff dates (so the ring appears and a second stall can be added).
+                  // Cleaning dates are also allowed — shown as split colour.
+                  const uniqueDates = Array.from(new Map(dates.map(d => [d.getTime(), d])).values());
+                  setSelectedTimeOffDates(uniqueDates);
                 }}
-                disabled={(date) => isDateSaved(date, 'cleaning')}
                 modifiers={{
                   cleaning: getSavedDatesForType('cleaning'),
                   timeoff: [...getSavedDatesForType('timeoff'), ...selectedTimeOffDates]
@@ -1206,14 +1203,15 @@ export default function AddPage() {
                   DayButton: (props) => {
                     const date = props.day.date;
                     const closure = getClosureForDate(date);
-                    // Show tooltip for all dates (past and future) if there's a closure
                     const title = closure ? getClosureTooltip(closure) : undefined;
                     const mods = props as { modifiers?: { cleaning?: boolean; timeoff?: boolean; today?: boolean } };
                     const isCleaning = mods.modifiers?.cleaning;
                     const isTimeoff = mods.modifiers?.timeoff;
                     const isToday = mods.modifiers?.today;
                     const both = isCleaning && isTimeoff;
-                    // Both cleaning+timeoff: half blue, half orange. Note: 50% gradient can show a sliver of orange at the edge; future fix could use two divs or 49%/51% for a crisper split.
+                    const isAlreadySaved = isDateSaved(date, 'timeoff');
+                    const isInSelected = selectedTimeOffDates.some(d => d.getTime() === date.getTime());
+                    // Both cleaning+timeoff: half blue, half orange.
                     const dayStyle =
                       both
                         ? { background: 'linear-gradient(to right, #60a5fa 0%, #60a5fa 50%, #fbbf24 50%, #fbbf24 100%)', opacity: 1 }
@@ -1225,12 +1223,16 @@ export default function AddPage() {
                         {...props}
                         title={title}
                         style={dayStyle}
+                        onClick={(e) => {
+                          if (props.onClick) props.onClick(e);
+                        }}
                         className={cn(
                           props.className,
                           "!rounded-xl [&>span]:!opacity-100",
                           both && "!opacity-100 !text-black",
                           isCleaning && !both && "!bg-[#60a5fa] !text-black",
                           isTimeoff && !both && "!bg-[#f59e0b] !text-black",
+                          isInSelected && "!ring-2 !ring-orange-500 !ring-offset-2",
                           isToday && !isCleaning && !isTimeoff && "!text-green-600 !font-bold !text-base",
                           isToday && (isCleaning || isTimeoff) && "!text-green-900 [&>span]:!text-green-900 !font-bold !text-base"
                         )}
@@ -1281,6 +1283,9 @@ export default function AddPage() {
               )}
               {selectedTimeOffDates.length > 0 && (
                 <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground px-3">
+                    {selectedTimeOffDates.length} day{selectedTimeOffDates.length !== 1 ? 's' : ''} closed
+                  </p>
                   <div className="space-y-2 px-1">
                     <Label>Location</Label>
                     <div className="min-w-0 overflow-visible">
