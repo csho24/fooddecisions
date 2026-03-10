@@ -347,15 +347,22 @@ if (isDateSaved(date, type)) return; // ❌ WRONG - prevents selecting saved dat
 | 10 | **Home banner: time off shows end date** — Orange lines now read "Ghim Moh — Mushroom Noodles time off until 9 Apr" instead of generic "closed today". Looks up the last date of the stall's time-off run from all stored closures. | ❌ No | In `HomeScreen.tsx`, fetch all closures (not just today's), find the last date for each time-off stall, and append "until X" to the banner line. |
 | 11 | **Home banner: label changed** — "closed today" → "time off until [date]" for time-off entries (drops the "on" for grammar). | ❌ No | Covered by item 10 above. |
 
+| 12 | **Save toast grammar fix** — Time off save confirmation now reads "Mushroom Noodles time off from 9 Mar to 9 Apr." (was "time off on 32 days"). Computes start and end date from selected dates array. | ❌ No | Find the save toast in `AddInfoScreen.tsx` for time off. Sort selected dates, format first and last as "D Mon", build string: `${itemName} time off from ${start} to ${end}.` (or just `from ${date}.` for single day). |
+| 13 | **Closure list sorted by date** — Scheduled closures list now sorts all entries (cleaning + time off mixed) chronologically by start date. Previously insertion order caused e.g. 11 Mar to appear above 10 Mar. | ❌ No | In `AddInfoScreen.tsx`, after building the combined closures list (cleaning + time off groups), sort by each group's start date string (YYYY-MM-DD, so string sort = chronological). Add `startDate` field to each group when merging consecutive dates. |
+| 14 | **Home food list: expiry-first sort** — In the Home tab of Food Lists, items with expiry dates now appear first sorted by soonest expiry, then remaining items alphabetically. | ❌ No | In `FoodListsScreen.tsx` (or wherever Home items are sorted), update sort: if both have expiry → sort by date asc; if only one has expiry → that one comes first; if neither → alphabetical. **Check first** whether mobile Home list already shows expiry dates — if expiry display doesn't exist on mobile yet, this sort is low priority until it does. |
+
 ### Summary for mobile
 Items 1–3 complete the Fix 10 + Fix 11 work from section 0c (now confirmed working on web).  
 Items 4–6 complete Fix 1 + Fix 8 from 0c for the time-off calendar specifically.  
 Items 7–8 are display/formatting fixes.  
-Items 9–11 are home banner improvements.
+Items 9–11 are home banner improvements.  
+Items 12–13 are save toast and list ordering fixes.  
+Item 14 is a food list sort improvement (check mobile expiry support first).
 
 **Files to update on mobile:**
-- `mobile/src/screens/AddInfoScreen.tsx` — items 1–8
+- `mobile/src/screens/AddInfoScreen.tsx` — items 1–8, 12–13
 - `mobile/src/screens/HomeScreen.tsx` — items 9–11
+- `mobile/src/screens/FoodListsScreen.tsx` — item 14 (after checking expiry support)
 
 ---
 

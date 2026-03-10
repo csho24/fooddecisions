@@ -226,8 +226,8 @@ export default function AddPage() {
   };
 
   // Group cleaning by (location, date range); consecutive dates become "16–17 Mar"
-  type CleaningGroup = { dateRange: string; displayLoc: string; ids: number[] };
-  type TimeOffGroup = { dateRange: string; displayLabel: string; ids: number[] };
+  type CleaningGroup = { dateRange: string; startDate: string; displayLoc: string; ids: number[] };
+  type TimeOffGroup = { dateRange: string; startDate: string; displayLabel: string; ids: number[] };
   const normalizeLocKey = (s: string) => s.trim().toLowerCase();
   const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const formatDateRange = (start: string, end: string): string => {
@@ -237,7 +237,7 @@ export default function AddPage() {
     if (m1 === m2) return `${d1}–${d2} ${MONTHS_SHORT[m1 - 1]}`;
     return `${d1} ${MONTHS_SHORT[m1 - 1]}–${d2} ${MONTHS_SHORT[m2 - 1]}`;
   };
-  const mergeConsecutiveDates = (dateToIds: Map<string, number[]>): Array<{ dateRange: string; ids: number[] }> => {
+  const mergeConsecutiveDates = (dateToIds: Map<string, number[]>): Array<{ dateRange: string; startDate: string; ids: number[] }> => {
     const sortedDates = Array.from(dateToIds.keys()).sort();
     if (sortedDates.length === 0) return [];
     const ranges: Array<{ start: string; end: string; ids: number[] }> = [];
@@ -267,7 +267,7 @@ export default function AddPage() {
       end: current[current.length - 1],
       ids: current.flatMap(date => dateToIds.get(date) ?? [])
     });
-    return ranges.map(r => ({ dateRange: formatDateRange(r.start, r.end), ids: r.ids }));
+    return ranges.map(r => ({ dateRange: formatDateRange(r.start, r.end), startDate: r.start, ids: r.ids }));
   };
   const buildCleaningGroups = (closures: ClosureSchedule[]): CleaningGroup[] => {
     const cleaning = closures.filter(c => c.type === 'cleaning');
@@ -283,8 +283,8 @@ export default function AddPage() {
     }
     const result: CleaningGroup[] = [];
     for (const { displayLoc, dateToIds } of Array.from(byLoc.values())) {
-      for (const { dateRange, ids } of mergeConsecutiveDates(dateToIds)) {
-        result.push({ dateRange, displayLoc, ids });
+      for (const { dateRange, startDate, ids } of mergeConsecutiveDates(dateToIds)) {
+        result.push({ dateRange, startDate, displayLoc, ids });
       }
     }
     return result;
@@ -304,8 +304,8 @@ export default function AddPage() {
     }
     const result: TimeOffGroup[] = [];
     for (const { displayLabel, dateToIds } of Array.from(byStall.values())) {
-      for (const { dateRange, ids } of mergeConsecutiveDates(dateToIds)) {
-        result.push({ dateRange, displayLabel, ids });
+      for (const { dateRange, startDate, ids } of mergeConsecutiveDates(dateToIds)) {
+        result.push({ dateRange, startDate, displayLabel, ids });
       }
     }
     return result;
@@ -314,8 +314,8 @@ export default function AddPage() {
   const upcomingTimeOffGroups = buildTimeOffGroups(upcomingClosures);
   const pastCleaningGroups = buildCleaningGroups(pastClosures);
   const pastTimeOffGroups = buildTimeOffGroups(pastClosures);
-  const upcomingClosuresList = [...upcomingCleaningGroups, ...upcomingTimeOffGroups];
-  const pastClosuresList = [...pastCleaningGroups, ...pastTimeOffGroups];
+  const upcomingClosuresList = [...upcomingCleaningGroups, ...upcomingTimeOffGroups].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const pastClosuresList = [...pastCleaningGroups, ...pastTimeOffGroups].sort((a, b) => a.startDate.localeCompare(b.startDate));
 
   const handleDeleteClosure = async (id: number) => {
     try {
@@ -1375,9 +1375,14 @@ export default function AddPage() {
                         setSavedClosures(updated);
                         
                         const itemName = selectedClosureFoodItem?.name || cleaningLocation;
+                        const sortedOff = [...selectedTimeOffDates].sort((a, b) => a.getTime() - b.getTime());
+                        const fmtOff = (d: Date) => `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+                        const offRange = sortedOff.length === 1
+                          ? fmtOff(sortedOff[0])
+                          : `${fmtOff(sortedOff[0])} to ${fmtOff(sortedOff[sortedOff.length - 1])}`;
                         toast({ 
                           title: "Saved!", 
-                          description: `${itemName} time off on ${selectedTimeOffDates.length} day${selectedTimeOffDates.length !== 1 ? 's' : ''}.` 
+                          description: `${itemName} time off from ${offRange}.`
                         });
                         
                         // Reset for next entry
