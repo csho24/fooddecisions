@@ -2,7 +2,7 @@
 
 **Purpose:** Bring the mobile app in line with recent web changes. Web is the primary test surface; changes should be transferred to mobile so both behave the same.
 
-**Last updated:** Feb 3, 2026
+**Last updated:** Mar 6, 2026
 
 **Note:** Some business logic functions are now shared in `shared/` folder:
 - ✅ `shared/utils.ts` - capitalizeWords, normalizeLocKey
@@ -325,6 +325,37 @@ if (isDateSaved(date, type)) return; // ❌ WRONG - prevents selecting saved dat
 - Web grouping: buildCleaningGroups, buildTimeOffGroups, mergeConsecutiveDates (same file)
 - Web location normalization: `client/src/pages/add-details.tsx` lines 177-201, 854, 899-930
 - Calendar Problems doc: `docs/Calendar Problems and Fixes.md` (February 3, 2026 section)
+
+---
+
+## 0d. March 6, 2026 Web Changes — Mobile Parity Needed
+
+**Date:** March 6, 2026  
+**Reference:** `docs/Calendar Problems and Fixes.md` (March 6, 2026 section)
+
+| # | Web change | Applied to mobile? | Action |
+|---|------------|--------------------|--------|
+| 1 | **Time Off calendar: cleaning dates no longer disabled/blocked** — Cleaning days within a time-off range are now selectable; a date can be both cleaning and time off. `disabled` prop removed; `onSelect` no longer strips cleaning dates. | ❌ No | Mobile still has cleaning dates disabled/blocked in time off flow. Remove that restriction in `AddInfoScreen.tsx` (same as Fix 10 in section 0c — now also web-confirmed). |
+| 2 | **Continuous time-off date range** — Removing the disabled/filter above means the `mergeConsecutiveDates` logic now sees a full unbroken chain (e.g. 9 Mar–9 Apr instead of 3 fragments). | ❌ No | Follows automatically from item 1 above once applied to mobile. |
+| 3 | **Half-half split colour now works** — When a date has both cleaning and time off, the blue/amber gradient now actually renders (was dead code before because overlap was impossible). | ❌ No | Same as Fix 11 in section 0c — now confirmed working on web. Apply gradient to mobile day cells when `isCleaning && isTimeoff`. |
+| 4 | **Time Off calendar: orange ring on selected dates** — Added `isInSelected` check and `ring-2 ring-orange-500` class to time-off DayButton, matching cleaning calendar. | ❌ No | Add orange border/ring to selected time-off dates in `AddInfoScreen.tsx` (mirrors Fix 1 / Fix 8 from 0c). |
+| 5 | **Time Off calendar: "X days closed" count text** — Shows count of selected days below calendar (was missing entirely on time off; cleaning had it). Both calendars now show "X days closed". | ❌ No | Add/update selected-dates text in `AddInfoScreen.tsx` for time off. Change existing cleaning text to "X days closed" if it's still showing the verbose date list format. |
+| 6 | **Re-clicking saved orange (timeoff) dates now works** — Fixed double-filter bug: `onSelect` was stripping saved timeoff dates right back out. Now re-clicking a saved amber date shows the ring so another stall can be added. | ❌ No | Check mobile `toggleDateSelection` — ensure clicking a saved timeoff date adds it back to selection (don't return early if already saved). |
+| 7 | **Cross-month date range display fixed** — `formatDateRange` was always using the start month for both numbers ("9–9 Mar" instead of "9 Mar–9 Apr"). Fixed to include both months when range crosses a month boundary. | ❌ No | Update equivalent date-range formatting in `AddInfoScreen.tsx`. Check how the scheduled closures list formats date ranges and add the cross-month case. |
+| 8 | **Calendar day gaps** — Fixed long-standing "blocks glued together" issue. Root cause: rows use `flex` layout so `border-spacing` was ignored. Fix: `gap-1` added to `weekdays` and `week` classNames in `calendar.tsx`. | N/A | Mobile uses React Native calendar (custom day cells, not HTML table). Gap between day cells is controlled differently — check `AddInfoScreen.tsx` day cell styles and add margin if blocks look stuck. |
+| 9 | **Home banner: regular closure takes precedence over time off** — If a stall is already listed as regularly closed today (weekly schedule), its time-off entry is suppressed from the orange section to avoid duplicates. | ❌ No | Apply same deduplication in `HomeScreen.tsx`: when building banner lines, filter out time-off entries whose `foodItemName` already appears in the regular-closures list. |
+| 10 | **Home banner: time off shows end date** — Orange lines now read "Ghim Moh — Mushroom Noodles time off until 9 Apr" instead of generic "closed today". Looks up the last date of the stall's time-off run from all stored closures. | ❌ No | In `HomeScreen.tsx`, fetch all closures (not just today's), find the last date for each time-off stall, and append "until X" to the banner line. |
+| 11 | **Home banner: label changed** — "closed today" → "time off until [date]" for time-off entries (drops the "on" for grammar). | ❌ No | Covered by item 10 above. |
+
+### Summary for mobile
+Items 1–3 complete the Fix 10 + Fix 11 work from section 0c (now confirmed working on web).  
+Items 4–6 complete Fix 1 + Fix 8 from 0c for the time-off calendar specifically.  
+Items 7–8 are display/formatting fixes.  
+Items 9–11 are home banner improvements.
+
+**Files to update on mobile:**
+- `mobile/src/screens/AddInfoScreen.tsx` — items 1–8
+- `mobile/src/screens/HomeScreen.tsx` — items 9–11
 
 ---
 

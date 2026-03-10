@@ -29,6 +29,7 @@ interface RegularClosure {
 
 export default function Home() {
   const [todaysClosures, setTodaysClosures] = useState<ClosureSchedule[]>([]);
+  const [allClosures, setAllClosures] = useState<ClosureSchedule[]>([]);
   const [regularClosuresToday, setRegularClosuresToday] = useState<RegularClosure[]>([]);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function Home() {
         const day = String(today.getDate()).padStart(2, '0');
         const todayStr = `${year}-${month}-${day}`;
         
+        setAllClosures(closures);
         const todayClosures = closures.filter(c => c.date === todayStr);
         setTodaysClosures(todayClosures);
       })
@@ -81,9 +83,11 @@ export default function Home() {
       .catch(err => console.error('Failed to fetch foods for closure check:', err));
   }, []);
 
+  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
   const closureBannerLines = useMemo(() => {
     if (todaysClosures.length === 0) return [];
-    const lines: { type: 'cleaning' | 'timeoff'; location: string; count?: number; foodItemName?: string }[] = [];
+    const lines: { type: 'cleaning' | 'timeoff'; location: string; count?: number; foodItemName?: string; until?: string }[] = [];
     const cleaningByLocation = new Map<string, ClosureSchedule[]>();
     const timeOffList: ClosureSchedule[] = [];
     for (const c of todaysClosures) {
@@ -101,10 +105,27 @@ export default function Home() {
     timeOffList.forEach(c => {
       const loc = c.location || 'Unknown';
       const stallName = c.foodItemName || 'Stall';
-      lines.push({ type: 'timeoff', location: loc, foodItemName: stallName });
+      // Find last date of this stall's time-off run
+      const stallKey = stallName.toLowerCase();
+      const locKey = loc.toLowerCase();
+      const allDates = allClosures
+        .filter(a =>
+          a.type === 'timeoff' &&
+          (a.foodItemName ?? '').toLowerCase() === stallKey &&
+          (a.location ?? '').toLowerCase() === locKey
+        )
+        .map(a => a.date)
+        .sort();
+      let until: string | undefined;
+      if (allDates.length > 0) {
+        const last = allDates[allDates.length - 1];
+        const [, m, d] = last.split('-').map(Number);
+        until = `${d} ${MONTHS_SHORT[m - 1]}`;
+      }
+      lines.push({ type: 'timeoff', location: loc, foodItemName: stallName, until });
     });
     return lines;
-  }, [todaysClosures]);
+  }, [todaysClosures, allClosures]);
 
   return (
     <Layout>
@@ -138,11 +159,19 @@ export default function Home() {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-foreground text-sm mb-1">Closed Today</p>
                 <div className="space-y-1">
-                  {closureBannerLines.map((line, i) => (
+                  {closureBannerLines
+                    .filter(line => {
+                      if (line.type !== 'timeoff') return true;
+                      // Regular weekly closure takes precedence — hide time-off if stall already shown below
+                      return !regularClosuresToday.some(r =>
+                        r.stallName.toLowerCase() === (line.foodItemName ?? '').toLowerCase()
+                      );
+                    })
+                    .map((line, i) => (
                     <p key={i} className={line.type === 'cleaning' ? "text-blue-700 text-sm" : "text-amber-700 text-sm"}>
                       {line.type === 'cleaning'
                         ? `${line.count} ${line.location} stall${line.count !== 1 ? 's' : ''} closed today`
-                        : `${line.location} — ${line.foodItemName} closed today`}
+                        : `${line.location} — ${line.foodItemName} time off${line.until ? ` until ${line.until}` : ' today'}`}
                     </p>
                   ))}
                   {regularClosuresToday.map((entry, i) => (
