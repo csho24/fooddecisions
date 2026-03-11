@@ -102,17 +102,19 @@ export default function Home() {
     cleaningByLocation.forEach((closures, location) => {
       lines.push({ type: 'cleaning', location, count: closures.length });
     });
+    // One line per stall: same stall can have multiple DB rows (one per day), so dedupe by (location, foodItemName)
+    const seenStall = new Set<string>();
     timeOffList.forEach(c => {
       const loc = c.location || 'Unknown';
       const stallName = c.foodItemName || 'Stall';
-      // Find last date of this stall's time-off run
-      const stallKey = stallName.toLowerCase();
-      const locKey = loc.toLowerCase();
+      const stallKey = `${(loc ?? '').toLowerCase()}|${(stallName ?? '').toLowerCase()}`;
+      if (seenStall.has(stallKey)) return;
+      seenStall.add(stallKey);
       const allDates = allClosures
         .filter(a =>
           a.type === 'timeoff' &&
-          (a.foodItemName ?? '').toLowerCase() === stallKey &&
-          (a.location ?? '').toLowerCase() === locKey
+          (a.foodItemName ?? '').toLowerCase() === (stallName ?? '').toLowerCase() &&
+          (a.location ?? '').toLowerCase() === (loc ?? '').toLowerCase()
         )
         .map(a => a.date)
         .sort();
@@ -157,7 +159,7 @@ export default function Home() {
                 <AlertCircle size={18} className="text-amber-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground text-sm mb-1">Closed Today</p>
+                <p className="font-semibold text-foreground text-base mb-1">Closed Today</p>
                 <div className="space-y-1">
                   {closureBannerLines
                     .filter(line => {
@@ -168,11 +170,16 @@ export default function Home() {
                       );
                     })
                     .map((line, i) => (
-                    <p key={i} className={line.type === 'cleaning' ? "text-blue-700 text-sm" : "text-amber-700 text-sm"}>
-                      {line.type === 'cleaning'
-                        ? `${line.count} ${line.location} stall${line.count !== 1 ? 's' : ''} closed today`
-                        : `${line.location} — ${line.foodItemName} time off${line.until ? ` until ${line.until}` : ' today'}`}
-                    </p>
+                    line.type === 'cleaning' ? (
+                      <p key={i} className="text-blue-700 text-sm">
+                        {line.count} {line.location} stall{line.count !== 1 ? 's' : ''} closed today
+                      </p>
+                    ) : (
+                      <div key={i} className="text-amber-700 text-sm">
+                        <div>{line.location} — {line.foodItemName}</div>
+                        <div>time off{line.until ? <><span className="whitespace-nowrap"> until {line.until}</span></> : ' today'}</div>
+                      </div>
+                    )
                   ))}
                   {regularClosuresToday.map((entry, i) => (
                     <p key={`reg-${i}`} className="text-muted-foreground text-sm">

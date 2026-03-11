@@ -1354,38 +1354,53 @@ export default function AddPage() {
                             loc.name.toLowerCase().includes(cleaningLocation.toLowerCase())
                           )?.name ?? cleaningLocation.trim()
                         );
-                        const schedules = selectedTimeOffDates.map(date => {
-                          // Format as local date (YYYY-MM-DD) to avoid timezone shift
+                        // Don't create a second row for the same stall on the same date — one stall can't be "closed twice" on one day
+                        const existingTimeOffDates = new Set(
+                          savedClosures
+                            .filter(c =>
+                              c.type === 'timeoff' &&
+                              normalizeLocKey(c.location ?? '') === normalizeLocKey(fullLocation) &&
+                              normalizeLocKey(c.foodItemName ?? '') === normalizeLocKey(selectedClosureFoodItem?.name ?? '')
+                            )
+                            .map(c => c.date)
+                        );
+                        const newTimeOffDates = selectedTimeOffDates.filter(d => {
+                          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                          return !existingTimeOffDates.has(dateStr);
+                        });
+                        if (newTimeOffDates.length === 0) {
+                          toast({
+                            title: "Already saved",
+                            description: `${selectedClosureFoodItem?.name ?? fullLocation} already has time off for all selected dates.`,
+                            variant: "default"
+                          });
+                          return;
+                        }
+                        const schedules = newTimeOffDates.map(date => {
                           const year = date.getFullYear();
                           const month = String(date.getMonth() + 1).padStart(2, '0');
                           const day = String(date.getDate()).padStart(2, '0');
                           return {
                             type: 'timeoff' as const,
                             date: `${year}-${month}-${day}`,
-                            location: capitalizeWords(fullLocation), // Ensure consistent capitalization
+                            location: capitalizeWords(fullLocation),
                             foodItemId: selectedClosureFoodItem?.id,
                             foodItemName: selectedClosureFoodItem?.name
                           };
                         });
-                        
                         await createClosureSchedules(schedules);
-                        
-                        // Refetch to show saved dates
                         const updated = await getClosureSchedules();
                         setSavedClosures(updated);
-                        
                         const itemName = selectedClosureFoodItem?.name || cleaningLocation;
-                        const sortedOff = [...selectedTimeOffDates].sort((a, b) => a.getTime() - b.getTime());
+                        const sortedOff = [...newTimeOffDates].sort((a, b) => a.getTime() - b.getTime());
                         const fmtOff = (d: Date) => `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
                         const offRange = sortedOff.length === 1
                           ? fmtOff(sortedOff[0])
                           : `${fmtOff(sortedOff[0])} to ${fmtOff(sortedOff[sortedOff.length - 1])}`;
-                        toast({ 
-                          title: "Saved!", 
+                        toast({
+                          title: "Saved!",
                           description: `${itemName} time off from ${offRange}.`
                         });
-                        
-                        // Reset for next entry
                         setSelectedTimeOffDates([]);
                         setCleaningLocation("");
                         setSelectedClosureFoodItem(null);

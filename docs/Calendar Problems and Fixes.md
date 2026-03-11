@@ -4,6 +4,49 @@ This document tracks specific problems encountered and their solutions.
 
 ---
 
+# March 11, 2026 — Duplicate time-off notification on home banner
+
+**Date:** March 11, 2026  
+**Status:** ✅ Fixed
+
+---
+
+## Issue: Same stall “time off until …” shown twice on home page
+
+**Problem:** On the home page, “Mushroom Noodles time off until 7 Apr” appeared twice under Closed Today.
+
+**Cause:** We store one row per day per time-off (e.g. 32 rows for 32 days). The banner was built by adding one line per row that matches “today.” If the same stall had been saved twice (e.g. two overlapping time-off entries), there were two rows for today for that stall, so we showed two identical lines.
+
+**Fix:** Deduplicate by stall (location + food item name). Show at most one line per stall; “until” is still the latest end date from all that stall’s time-off rows. Implemented in `home.tsx` with a `seenStall` set keyed by `location|stallName`.
+
+**Deletions:** When you delete a time-off entry from the Scheduled Closures list, the app deletes every row in that group (one API call per day in the range). So one delete removes the whole range. If you still saw two notifications, it was because we were drawing one line per DB row for today; the dedupe above fixes the display. If you had two separate groups (e.g. two saves) and deleted one, the other group’s rows remain and we correctly show one line for that stall.
+
+---
+
+## Issue: Time-off notification line too long; widow word (“April” alone on second line)
+
+**Problem:** The single line “Ghim Moh — Mushroom Noodles time off until 7 April” wrapped badly on small screens, leaving “7” on one line and “April” on the next (widow word).
+
+**Fix:** Time-off notifications are now always two lines: first line = “Ghim Moh — Mushroom Noodles”, second line = “time off until 7 Apr”. The “until [date]” part uses `whitespace-nowrap` so the date never splits. Cleaning lines unchanged (single line).
+
+**Files changed:** `client/src/pages/home.tsx`
+
+---
+
+## Principle: What you see on the site must match the database
+
+**Expectation:** If I delete something on the website, it is deleted from the database. If I add dates in the calendar, what shows on the site is what is stored. No “five copies in the DB when I can only see one and deleted the other four.”
+
+**What went wrong:** Duplicate time-off rows for the same stall on the same date could exist (e.g. from saving more than once, including when re-entering dates around already-shaded days in the middle). The list under the calendar groups by stall and range, so it showed one entry, but the DB could still have multiple rows for that stall for “today” → double (or more) notifications on the homepage. Deleting the list entry removed one group’s rows but not necessarily all duplicates if they had been created in separate saves.
+
+**Why that’s bad:** The UI suggested one time-off block; the DB could hold invisible duplicates. User deletes once and expects it gone; leftover rows kept showing up (e.g. extra notification lines).
+
+**Fixes applied:** (1) Homepage: show at most one line per stall (dedupe by location + stall). (2) Save: before inserting time off, skip any date that already has this stall’s time off, so we never create a second row for the same stall on the same day. Delete-from-list already removes all rows in that group; the save-time check stops new duplicates from being created.
+
+**Files changed:** `client/src/pages/home.tsx` (dedupe), `client/src/pages/add-details.tsx` (save-time skip of existing dates).
+
+---
+
 # March 6, 2026 — Time Off calendar parity, broken date ranges, cross-month display
 
 **Date:** March 6, 2026  
