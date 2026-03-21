@@ -66,7 +66,7 @@ export default function Home() {
             if (closedLocs.length === 0) continue;
 
             if (closedLocs.length === item.locations.length || item.locations.length === 1) {
-              result.push({ stallName: item.name, locationName: null });
+              result.push({ stallName: item.name, locationName: closedLocs[0].name });
             } else {
               for (const loc of closedLocs) {
                 result.push({ stallName: item.name, locationName: loc.name });
