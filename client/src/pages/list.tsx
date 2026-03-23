@@ -429,7 +429,15 @@ export default function ListPage() {
                             locationSuggestionsRef.current = locationSuggestions;
                             return (
                               <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                                {locationSuggestions.map((loc, idx) => (
+                                {locationSuggestions.map((loc, idx) => {
+                                  const applyLocationPick = () => {
+                                    form.setValue('location', loc);
+                                    setLocationQuery(loc);
+                                    setShowLocationSuggestions(false);
+                                    setHighlightIdx(-1);
+                                    locationInputRef.current?.blur();
+                                  };
+                                  return (
                                   <button
                                     key={loc}
                                     type="button"
@@ -437,20 +445,20 @@ export default function ListPage() {
                                       "w-full text-left px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl",
                                       idx === highlightedLocationIndex ? "bg-accent" : "hover:bg-accent"
                                     )}
-                                    onClick={() => {
-                                      form.setValue('location', loc);
-                                      setLocationQuery(loc);
-                                      setShowLocationSuggestions(false);
-                                      setHighlightIdx(-1);
-                                      locationInputRef.current?.blur();
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onTouchEnd={(e) => {
+                                      e.preventDefault();
+                                      applyLocationPick();
                                     }}
+                                    onClick={() => applyLocationPick()}
                                   >
                                     <div className="flex items-center gap-2">
                                       <MapPin className="h-4 w-4 text-muted-foreground" />
                                       <span>{loc}</span>
                                     </div>
                                   </button>
-                                ))}
+                                  );
+                                })}
                               </div>
                             );
                           })()}

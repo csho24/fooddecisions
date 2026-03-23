@@ -4,6 +4,38 @@ This document tracks specific problems encountered and their solutions.
 
 ---
 
+# March 23, 2026 - Mobile location suggestion tap not applying
+
+**Date:** March 23, 2026  
+**Status:** ⚠️ Fix implemented, pending user phone verification
+
+---
+
+## Issue: On phone, tapping location suggestion keeps typed text (e.g. "marg")
+
+### Problem
+In Food List → Quick Add (Out), typing a partial location (e.g. "marg") showed suggestions correctly, but tapping a suggestion did not fill the input. The field stayed as "marg". On laptop, this worked.
+
+### Root Cause
+Mobile tap event order differs from desktop. Input blur can fire before the suggestion click handler. Blur then commits the partially typed text and closes suggestions; the suggestion tap often never applies.
+
+### Fix
+In `client/src/pages/list.tsx` suggestion rows:
+- Added `onMouseDown={(e) => e.preventDefault()}` to prevent early blur.
+- Added `onTouchEnd` to apply selection directly on tap for mobile reliability.
+- Kept existing click handler for desktop.
+
+### Files Changed
+- `client/src/pages/list.tsx`
+
+### Verification Needed
+- User to test on phone:
+  1. Type partial location (e.g. "marg")
+  2. Tap suggestion ("Margaret Drive")
+  3. Confirm field updates to full selected location
+
+---
+
 # January 14, 2025 - Closure Calendar Feature Fixes
 
 **Date:** January 14, 2025  

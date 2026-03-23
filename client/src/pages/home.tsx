@@ -100,7 +100,9 @@ export default function Home() {
       }
     }
     cleaningByLocation.forEach((closures, location) => {
-      lines.push({ type: 'cleaning', location, count: closures.length });
+      const loc = location.trim();
+      const displayLoc = loc.toLowerCase().endsWith('hawker centre') ? loc : `${loc} Hawker Centre`;
+      lines.push({ type: 'cleaning', location: displayLoc, count: closures.length });
     });
     // One line per stall: same stall can have multiple DB rows (one per day), so dedupe by (location, foodItemName)
     const seenStall = new Set<string>();
@@ -172,7 +174,7 @@ export default function Home() {
                     .map((line, i) => (
                     line.type === 'cleaning' ? (
                       <p key={i} className="text-blue-700 text-sm">
-                        {line.count} {line.location} stall{line.count !== 1 ? 's' : ''} closed today
+                        {line.location}
                       </p>
                     ) : (
                       <div key={i} className="text-amber-700 text-sm">
