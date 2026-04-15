@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layout } from "@/components/mobile-layout";
 import { useFoodStore, FoodItem } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { categorizeFood, FoodCategory } from "../../../shared/business-logic";
+import { getClosureSchedules, type ClosureSchedule } from "@/lib/api";
 
 export default function Decide() {
   const { items, checkAvailability } = useFoodStore();
@@ -20,6 +21,114 @@ export default function Decide() {
   const [selectedFoodCategory, setSelectedFoodCategory] = useState<FoodCategory | null>(null);
   const [selectedFoodFromLocation, setSelectedFoodFromLocation] = useState<string | null>(null);
   const [selectedFoodFromCategory, setSelectedFoodFromCategory] = useState<string | null>(null);
+  const [todaysClosures, setTodaysClosures] = useState<ClosureSchedule[]>([]);
+
+  useEffect(() => {
+    getClosureSchedules()
+      .then((closures) => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, "0");
+        const day = String(today.getDate()).padStart(2, "0");
+        const todayStr = `${year}-${month}-${day}`;
+        setTodaysClosures(closures.filter((c) => c.date === todayStr));
+      })
+      .catch((err) => console.error("Failed to fetch closures for Decide:", err));
+  }, []);
+
+  const getScheduleClosureReason = useMemo(() => {
+    const byFoodId = new Map<string, ClosureSchedule[]>();
+    const byFoodName = new Map<string, ClosureSchedule[]>();
+    const byLocation = new Map<string, ClosureSchedule[]>();
+
+    for (const c of todaysClosures) {
+      if (c.foodItemId) {
+        const key = c.foodItemId.toString().trim().toLowerCase();
+        if (key) byFoodId.set(key, [...(byFoodId.get(key) || []), c]);
+      }
+      if (c.foodItemName) {
+        const key = c.foodItemName.trim().toLowerCase();
+        if (key) byFoodName.set(key, [...(byFoodName.get(key) || []), c]);
+      }
+      if (c.location) {
+        const key = c.location.trim().toLowerCase();
+        if (key) byLocation.set(key, [...(byLocation.get(key) || []), c]);
+      }
+    }
+
+    return (item: FoodItem, contextLocationName?: string | null): { closed: boolean; reason?: string } => {
+      if (item.type !== "out") return { closed: false };
+
+      const itemIdKey = item.id?.toString().trim().toLowerCase();
+      const itemNameKey = item.name?.trim().toLowerCase();
+      const locKey = contextLocationName?.trim().toLowerCase();
+
+      const candidates: ClosureSchedule[] = [
+        ...(itemIdKey ? (byFoodId.get(itemIdKey) || []) : []),
+        ...(itemNameKey ? (byFoodName.get(itemNameKey) || []) : []),
+      ];
+
+      // Time off: if a row has a location, treat it as location-specific when we have context.
+      // If no context, err on the side of showing "closed today" to prevent careless picks.
+      const timeOffCandidates = candidates.filter((c) => c.type === "timeoff");
+      if (timeOffCandidates.length > 0) {
+        const stallWide = timeOffCandidates.find((c) => !(c.location || "").trim());
+        if (stallWide) return { closed: true, reason: "Time off" };
+        if (locKey) {
+          const match = timeOffCandidates.find((c) => (c.location || "").trim().toLowerCase() === locKey);
+          if (match) return { closed: true, reason: "Time off" };
+        } else {
+          return { closed: true, reason: "Time off" };
+        }
+      }
+
+      // Cleaning is location-based; if we're viewing within a location context, require match.
+      const cleaningCandidates = candidates.filter((c) => c.type === "cleaning");
+      if (cleaningCandidates.length > 0) {
+        if (locKey) {
+          const match = cleaningCandidates.find((c) => (c.location || "").trim().toLowerCase() === locKey);
+          if (match) return { closed: true, reason: "Cleaning" };
+        } else {
+          // No location context (e.g. browsing by food category/search). If ANY cleaning closure exists for the stall today,
+          // treat as closed for a safer "don't forget it's closed" UX.
+          return { closed: true, reason: "Cleaning" };
+        }
+      }
+
+      // If closure rows exist only by location (no foodItemName), still close items when browsing within that location.
+      if (locKey) {
+        const locClosures = byLocation.get(locKey) || [];
+        const locTimeOff = locClosures.find((c) => c.type === "timeoff" && (c.foodItemName || "").trim().toLowerCase() === itemNameKey);
+        if (locTimeOff) return { closed: true, reason: "Time off" };
+        const locCleaning = locClosures.find((c) => c.type === "cleaning" && (c.foodItemName || "").trim().toLowerCase() === itemNameKey);
+        if (locCleaning) return { closed: true, reason: "Cleaning" };
+      }
+
+      return { closed: false };
+    };
+  }, [todaysClosures]);
+
+  const getDecideAvailability = useMemo(() => {
+    return (item: FoodItem, contextLocationName?: string | null) => {
+      if (item.type === "home") return checkAvailability(item);
+
+      // Prefer checking within a specific location context when we have one.
+      if (contextLocationName && item.locations?.length) {
+        const target = item.locations.find((l) => l.name?.trim().toLowerCase() === contextLocationName.trim().toLowerCase());
+        if (target) return checkAvailability(item, target.id);
+      }
+
+      // Otherwise (food-category/search), compute "any open" across locations so weekly closedDays actually show in Decide.
+      if (item.locations?.length) {
+        const statuses = item.locations.map((l) => checkAvailability(item, l.id));
+        const anyOpen = statuses.some((s) => s.available);
+        if (anyOpen) return { available: true as const };
+        return { available: false as const, reason: statuses.find((s) => s.reason)?.reason || "Closed today" };
+      }
+
+      return checkAvailability(item);
+    };
+  }, [checkAvailability]);
 
   // Derived state for filtering and sorting
   const groupedItems = useMemo(() => {
@@ -40,11 +149,15 @@ export default function Decide() {
        return {}; // No search, no type selected -> return empty
     }
 
-    // Process availability for all items first
-    const itemsWithAvailability = filtered.map(item => ({
-      ...item,
-      status: checkAvailability(item)
-    }));
+    // Process availability for all items first (includes weekly closedDays + today's closure schedules)
+    const itemsWithAvailability = filtered.map(item => {
+      const base = getDecideAvailability(item, selectedType === "out" ? selectedLocation : null);
+      const scheduled = getScheduleClosureReason(item, selectedType === "out" ? selectedLocation : null);
+      const status = scheduled.closed
+        ? { available: false as const, reason: `Closed today (${scheduled.reason})` }
+        : base;
+      return { ...item, status, closedBySchedule: scheduled.closed };
+    });
 
     // Grouping Logic
     if (searchQuery.trim()) {
@@ -72,7 +185,7 @@ export default function Decide() {
         return acc;
       }, {} as Record<string, typeof itemsWithAvailability>);
     }
-  }, [items, selectedType, checkAvailability, searchQuery]);
+  }, [items, selectedType, selectedLocation, getDecideAvailability, getScheduleClosureReason, searchQuery]);
 
   // Get unique locations from Out items
   const uniqueLocations = useMemo(() => {
@@ -103,7 +216,12 @@ export default function Decide() {
       .filter(item => item.type === 'out')
       .map(item => ({
         ...item,
-        status: checkAvailability(item),
+        status: (() => {
+          const base = getDecideAvailability(item, null);
+          const scheduled = getScheduleClosureReason(item, null);
+          return scheduled.closed ? { available: false as const, reason: `Closed today (${scheduled.reason})` } : base;
+        })(),
+        closedBySchedule: getScheduleClosureReason(item, null).closed,
         // Use saved category if it exists and is a valid FoodCategory, otherwise auto-categorize
         foodCategory: (item.category && ['Noodles', 'Rice', 'Ethnic', 'Light', 'Western'].includes(item.category)) 
           ? (item.category as FoodCategory) 
@@ -116,7 +234,7 @@ export default function Decide() {
       acc[category].push(item);
       return acc;
     }, {} as Record<FoodCategory, typeof outItems>);
-  }, [items, selectedType, checkAvailability]);
+  }, [items, selectedType, getDecideAvailability, getScheduleClosureReason]);
 
   // Get items for selected location
   const itemsByLocation = useMemo(() => {
@@ -128,9 +246,14 @@ export default function Decide() {
       )
       .map(item => ({
         ...item,
-        status: checkAvailability(item)
+        status: (() => {
+          const base = getDecideAvailability(item, selectedLocation);
+          const scheduled = getScheduleClosureReason(item, selectedLocation);
+          return scheduled.closed ? { available: false as const, reason: `Closed today (${scheduled.reason})` } : base;
+        })(),
+        closedBySchedule: getScheduleClosureReason(item, selectedLocation).closed,
       }));
-  }, [items, selectedType, selectedLocation, checkAvailability]);
+  }, [items, selectedType, selectedLocation, getDecideAvailability, getScheduleClosureReason]);
 
   const handleTypeSelect = (type: 'home' | 'out') => {
     setSelectedType(type);
@@ -173,12 +296,19 @@ export default function Decide() {
             className={cn(
               "p-4 flex items-start gap-3 transition-colors",
               index !== 0 && "border-t border-border/50",
+              // Closed due to schedule (cleaning/time off): light red tint to match home warnings
+              // @ts-expect-error - injected at runtime in Decide maps
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (item as any).closedBySchedule && "bg-red-50/60",
               !item.status.available ? "bg-muted/30 text-muted-foreground" : "hover:bg-accent/50 cursor-pointer"
             )}
           >
             <div className={cn(
               "w-2 h-2 mt-2 rounded-full shrink-0",
-              item.status.available ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-gray-300"
+              // @ts-expect-error - injected at runtime in Decide maps
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (item as any).closedBySchedule ? "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]" :
+              (item.status.available ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-gray-300")
             )} />
             
             <div className="flex-1 min-w-0">
@@ -327,12 +457,18 @@ export default function Decide() {
                              className={cn(
                                "p-4 flex items-start gap-3 transition-colors",
                                index !== 0 && "border-t border-border/50",
+                               // @ts-expect-error - injected at runtime in Decide maps
+                               // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                               (item as any).closedBySchedule && "bg-red-50/60",
                                !item.status.available ? "bg-muted/30 text-muted-foreground" : "hover:bg-accent/50 cursor-pointer"
                              )}
                            >
                              <div className={cn(
                                "w-2 h-2 mt-2 rounded-full shrink-0",
-                               item.status.available ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-gray-300"
+                               // @ts-expect-error - injected at runtime in Decide maps
+                               // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                               (item as any).closedBySchedule ? "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]" :
+                               (item.status.available ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-gray-300")
                              )} />
                              
                              <div className="flex-1 min-w-0">
@@ -467,11 +603,22 @@ export default function Decide() {
                               <Button
                                 key={item.id}
                                 variant="outline"
-                                className="w-full h-16 text-left justify-start rounded-xl"
+                                  className={cn(
+                                    "w-full h-16 text-left justify-start rounded-xl",
+                                    // @ts-expect-error - injected at runtime in Decide maps
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    (item as any).closedBySchedule && "bg-red-50 border-red-200 text-red-950 hover:bg-red-50/80"
+                                  )}
                                 onClick={() => setSelectedFoodFromLocation(item.name)}
                               >
                                 <Utensils size={20} className="mr-3 text-primary" />
-                                <span className="text-lg font-medium">{item.name}</span>
+                                  <span className="text-lg font-medium">{item.name}</span>
+                                  {/* Only show a badge when it's actually closed-today (not opening-hours like \"Opens 10:00\") */}
+                                  {!item.status.available && (item.status.reason || "").toLowerCase().includes("closed today") && (
+                                    <span className="ml-auto text-[11px] font-medium px-2 py-1 rounded bg-destructive/10 text-destructive">
+                                      {item.status.reason || "Closed"}
+                                    </span>
+                                  )}
                               </Button>
                             ))}
                           </div>
@@ -502,6 +649,7 @@ export default function Decide() {
                                       key={loc.id}
                                       className={cn(
                                         "p-4",
+                                        getScheduleClosureReason(foodItem, loc.name).closed && "bg-red-50/60",
                                         index !== 0 && "border-t border-border/50"
                                       )}
                                     >
@@ -577,11 +725,22 @@ export default function Decide() {
                               <Button
                                 key={item.id}
                                 variant="outline"
-                                className="w-full h-16 text-left justify-start rounded-xl"
+                                className={cn(
+                                  "w-full h-16 text-left justify-start rounded-xl",
+                                  // @ts-expect-error - injected at runtime in Decide maps
+                                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                  (item as any).closedBySchedule && "bg-red-50 border-red-200 text-red-950 hover:bg-red-50/80"
+                                )}
                                 onClick={() => setSelectedFoodFromCategory(item.name)}
                               >
                                 <Utensils size={20} className="mr-3 text-primary" />
                                 <span className="text-lg font-medium">{item.name}</span>
+                                {/* Only show a badge when it's actually closed-today (not opening-hours like \"Opens 10:00\") */}
+                                {!item.status.available && (item.status.reason || "").toLowerCase().includes("closed today") && (
+                                  <span className="ml-auto text-[11px] font-medium px-2 py-1 rounded bg-destructive/10 text-destructive">
+                                    {item.status.reason || "Closed"}
+                                  </span>
+                                )}
                               </Button>
                             ))}
                           </div>
@@ -612,6 +771,7 @@ export default function Decide() {
                                       key={loc.id}
                                       className={cn(
                                         "p-4",
+                                        getScheduleClosureReason(foodItem, loc.name).closed && "bg-red-50/60",
                                         index !== 0 && "border-t border-border/50"
                                       )}
                                     >

@@ -103,6 +103,8 @@ export default function AddPage() {
   const [closureStep, setClosureStep] = useState<'main' | 'closure' | 'cleaning' | 'timeoff' | 'expiry'>('main');
   const [selectedCleaningDates, setSelectedCleaningDates] = useState<Date[]>([]);
   const [selectedTimeOffDates, setSelectedTimeOffDates] = useState<Date[]>([]);
+  const [timeOffRangeText, setTimeOffRangeText] = useState("");
+  const [timeOffRangeTriedApply, setTimeOffRangeTriedApply] = useState(false);
   const [cleaningLocation, setCleaningLocation] = useState("");
   const [selectedClosureFoodItem, setSelectedClosureFoodItem] = useState<FoodItem | null>(null);
   const [savedClosures, setSavedClosures] = useState<ClosureSchedule[]>([]);
@@ -171,6 +173,22 @@ export default function AddPage() {
     );
     locKeys.delete('');
     return locKeys.size;
+  };
+
+  // Number of DISTINCT time off stall entries on a date (location+stall).
+  // Dark orange should only happen when 2+ different stall entries share the same date.
+  const getTimeOffEntryCountForDate = (date: Date): number => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    const keys = new Set(
+      savedClosures
+        .filter(c => c.type === 'timeoff' && c.date === dateStr)
+        .map(c => `${normalizeLocKey(c.location ?? '')}|${normalizeLocKey(c.foodItemName ?? '')}`)
+    );
+    keys.delete('|');
+    return keys.size;
   };
 
   // All cleaning closures for a date (for tooltip when multiple locations)
@@ -342,6 +360,76 @@ export default function AddPage() {
       toast({ title: "Error", description: "Failed to delete closure.", variant: "destructive" });
     }
   };
+
+  const monthMap: Record<string, number> = {
+    jan: 0, january: 0,
+    feb: 1, february: 1,
+    mar: 2, march: 2,
+    apr: 3, april: 3,
+    may: 4,
+    jun: 5, june: 5,
+    jul: 6, july: 6,
+    aug: 7, august: 7,
+    sep: 8, sept: 8, september: 8,
+    oct: 9, october: 9,
+    nov: 10, november: 10,
+    dec: 11, december: 11,
+  };
+
+  const parseDayMonthYear = (raw: string, fallbackYear: number): Date | null => {
+    const s = raw.trim().replace(/\s+/g, " ");
+    // e.g. "7 Apr", "7 April 2026"
+    const m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,9})(?:\s+(\d{4}))?$/);
+    if (!m) return null;
+    const day = Number(m[1]);
+    const monthKey = m[2].toLowerCase();
+    const month = monthMap[monthKey];
+    if (month === undefined) return null;
+    const year = m[3] ? Number(m[3]) : fallbackYear;
+    const d = new Date(year, month, day);
+    // Validate date didn't roll (e.g. 31 Apr)
+    if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) return null;
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  const parseTimeOffRange = (raw: string): { start: Date; end: Date } | null => {
+    const text = raw.trim();
+    if (!text) return null;
+    const normalized = text.replace(/\u2013|\u2014/g, "-"); // en/em dash
+    const parts = normalized.split(/\s+to\s+|-/i).map(p => p.trim()).filter(Boolean);
+    if (parts.length !== 2) return null;
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const start = parseDayMonthYear(parts[0], year);
+    if (!start) return null;
+
+    // If end has no year, and month looks earlier than start month, assume next year (rare but safe).
+    const endNoYear = !/\d{4}/.test(parts[1]);
+    const endCandidate = parseDayMonthYear(parts[1], year);
+    if (!endCandidate) return null;
+    let end = endCandidate;
+    if (endNoYear && end.getMonth() < start.getMonth()) {
+      const adjusted = parseDayMonthYear(parts[1], year + 1);
+      if (adjusted) end = adjusted;
+    }
+
+    if (end.getTime() < start.getTime()) return null;
+    return { start, end };
+  };
+
+  const timeOffRangeDates = useMemo(() => {
+    const parsed = parseTimeOffRange(timeOffRangeText);
+    if (!parsed) return null;
+    const dates: Date[] = [];
+    const cur = new Date(parsed.start);
+    while (cur.getTime() <= parsed.end.getTime()) {
+      dates.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }, [timeOffRangeText]);
 
   // Expiry State
   const [selectedExpiryCategory, setSelectedExpiryCategory] = useState<'Fridge' | 'Snacks' | null>(null);
@@ -773,10 +861,12 @@ export default function AddPage() {
                     const both = isCleaning && isTimeoff;
                     const cleaningCount = getCleaningCountForDate(date);
                     const cleaningLocCount = getCleaningLocationCountForDate(date);
+                    const timeOffEntryCount = getTimeOffEntryCountForDate(date);
                     const cleaningClosures = getCleaningClosuresForDate(date);
                     const closure = getClosureForDate(date);
                     // Dark blue ONLY when 2+ distinct locations share this date
                     const shouldBeDarkBlue = isCleaning && cleaningLocCount >= 2;
+                    const shouldBeDarkOrange = isTimeoff && timeOffEntryCount >= 2;
                     const title = isTimeoff
                       ? (closure ? getClosureTooltip(closure) : undefined)
                       : (cleaningCount > 0
@@ -815,7 +905,7 @@ export default function AddPage() {
                           "!rounded-xl [&>span]:!opacity-100",
                           both && "!opacity-100 !text-black",
                           isCleaning && !both && (shouldBeDarkBlue ? "!bg-[#1e40af] !text-black" : "!bg-[#60a5fa] !text-black"),
-                          isTimeoff && !both && "!bg-[#f59e0b] !text-black",
+                          isTimeoff && !both && (shouldBeDarkOrange ? "!bg-[#b45309] !text-black" : "!bg-[#f59e0b] !text-black"),
                           isInSelected && "!ring-2 !ring-orange-500 !ring-offset-2",
                           isToday && !isCleaning && !isTimeoff && "!text-green-600 !font-bold !text-base",
                           isToday && (isCleaning || isTimeoff) && "!text-green-900 [&>span]:!text-green-900 !font-bold !text-base"
@@ -1209,6 +1299,8 @@ export default function AddPage() {
                     const isTimeoff = mods.modifiers?.timeoff;
                     const isToday = mods.modifiers?.today;
                     const both = isCleaning && isTimeoff;
+                    const timeOffEntryCount = getTimeOffEntryCountForDate(date);
+                    const shouldBeDarkOrange = isTimeoff && timeOffEntryCount >= 2;
                     const isAlreadySaved = isDateSaved(date, 'timeoff');
                     const isInSelected = selectedTimeOffDates.some(d => d.getTime() === date.getTime());
                     // Both cleaning+timeoff: half blue, half orange.
@@ -1231,7 +1323,7 @@ export default function AddPage() {
                           "!rounded-xl [&>span]:!opacity-100",
                           both && "!opacity-100 !text-black",
                           isCleaning && !both && "!bg-[#60a5fa] !text-black",
-                          isTimeoff && !both && "!bg-[#f59e0b] !text-black",
+                          isTimeoff && !both && (shouldBeDarkOrange ? "!bg-[#b45309] !text-black" : "!bg-[#f59e0b] !text-black"),
                           isInSelected && "!ring-2 !ring-orange-500 !ring-offset-2",
                           isToday && !isCleaning && !isTimeoff && "!text-green-600 !font-bold !text-base",
                           isToday && (isCleaning || isTimeoff) && "!text-green-900 [&>span]:!text-green-900 !font-bold !text-base"
@@ -1242,107 +1334,109 @@ export default function AddPage() {
                 }}
                 className="rounded-xl border w-full"
               />
-              {/* Show scheduled closures list (all entries, scroll if many) */}
-              {upcomingClosuresList.length > 0 && (
-                <div className="bg-muted/30 rounded-xl p-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">
-                    Scheduled Closures{upcomingClosuresList.length > 5 ? ` (${upcomingClosuresList.length} — scroll to see all)` : ''}:
-                  </p>
-                  <div className="max-h-[220px] overflow-y-scroll overflow-x-hidden rounded-md border border-transparent pr-1" style={{ scrollbarGutter: 'stable' }}>
-                    <div className="space-y-1.5 pr-1">
-                  {upcomingClosuresList.map((entry) => {
-                    if ('displayLoc' in entry) {
-                      const g = entry as CleaningGroup;
-                      return (
-                        <div key={`to-c-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
-                          <span className="min-w-0 flex-1">{g.displayLoc}</span>
-                          <span className="opacity-70 shrink-0">{g.dateRange}</span>
-                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      );
-                    }
-                    if ('displayLabel' in entry) {
-                      const g = entry as TimeOffGroup;
-                      return (
-                        <div key={`to-t-${g.dateRange}-${normalizeLocKey(g.displayLabel)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
-                          <span className="min-w-0 flex-1">{g.displayLabel}</span>
-                          <span className="opacity-70 shrink-0">{g.dateRange}</span>
-                          <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
-                    </div>
+              <div className="space-y-4">
+                <div className="space-y-2 px-1">
+                  <Label>Location</Label>
+                  <div className="min-w-0 overflow-visible">
+                    <Input 
+                      placeholder="e.g. Ghim Moh, Maxwell..."
+                      value={cleaningLocation}
+                      onChange={(e) => {
+                        setCleaningLocation(e.target.value);
+                        setSelectedClosureFoodItem(null);
+                      }}
+                      onBlur={(e) => {
+                        const capitalized = capitalizeWords(e.target.value);
+                        setCleaningLocation(capitalized);
+                      }}
+                      className="h-12 rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    />
                   </div>
                 </div>
-              )}
+                
+                {cleaningLocation.trim() && (() => {
+                  const matchingItems = items.filter(item => 
+                    item.type === 'out' && 
+                    item.locations?.some(loc => 
+                      loc.name.toLowerCase().includes(cleaningLocation.toLowerCase())
+                    )
+                  );
+                  
+                  if (matchingItems.length === 0) {
+                    return (
+                      <div className="text-center py-3 text-muted-foreground bg-muted/20 rounded-xl border border-dashed text-sm">
+                        <p>No food items found with "{cleaningLocation}"</p>
+                        <p className="text-xs mt-1">Add this location to a food item first</p>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div className="space-y-2">
+                      <Label>Which stall?</Label>
+                      <div className="space-y-1.5">
+                        {matchingItems.map(item => (
+                          <Button
+                            key={item.id}
+                            type="button"
+                            variant={selectedClosureFoodItem?.id === item.id ? "default" : "outline"}
+                            className="w-full h-auto py-2.5 px-3 text-left justify-start rounded-xl text-sm"
+                            onClick={() => setSelectedClosureFoodItem(
+                              selectedClosureFoodItem?.id === item.id ? null : item
+                            )}
+                          >
+                            <span className="font-medium">{item.name}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="bg-card border border-border/50 rounded-2xl p-4 space-y-2">
+                <Label>Add Date Range</Label>
+                <Input
+                  value={timeOffRangeText}
+                  onChange={(e) => {
+                    setTimeOffRangeText(e.target.value);
+                    setTimeOffRangeTriedApply(false);
+                  }}
+                  onBlur={() => {
+                    // Only show parse error after the user has finished typing (blur) or explicitly tried Apply
+                    setTimeOffRangeTriedApply(true);
+                  }}
+                  placeholder="e.g. 7 Apr to 20 May"
+                  className="h-12 rounded-xl bg-muted/30 placeholder:text-muted-foreground/50"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="shrink-0 rounded-xl"
+                    disabled={!selectedClosureFoodItem || !timeOffRangeDates || timeOffRangeDates.length === 0}
+                    onClick={() => {
+                      if (!timeOffRangeDates) return;
+                      setTimeOffRangeTriedApply(true);
+                      // Merge into selection (same behavior as clicking multiple days)
+                      const merged = [...selectedTimeOffDates, ...timeOffRangeDates];
+                      const uniqueDates = Array.from(new Map(merged.map(d => [d.getTime(), d])).values());
+                      setSelectedTimeOffDates(uniqueDates);
+                    }}
+                  >
+                    Apply
+                  </Button>
+                </div>
+                {timeOffRangeText.trim() && timeOffRangeTriedApply && !timeOffRangeDates && (
+                  <p className="text-xs text-destructive">
+                    Couldn’t read that range. Try “7 Apr to 20 May”.
+                  </p>
+                )}
+              </div>
               {selectedTimeOffDates.length > 0 && (
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground px-3">
                     {selectedTimeOffDates.length} day{selectedTimeOffDates.length !== 1 ? 's' : ''} closed
                   </p>
-                  <div className="space-y-2 px-1">
-                    <Label>Location</Label>
-                    <div className="min-w-0 overflow-visible">
-                      <Input 
-                        placeholder="e.g. Ghim Moh, Maxwell..."
-                        value={cleaningLocation}
-                        onChange={(e) => {
-                          setCleaningLocation(e.target.value);
-                          setSelectedClosureFoodItem(null);
-                        }}
-                        onBlur={(e) => {
-                          const capitalized = capitalizeWords(e.target.value);
-                          setCleaningLocation(capitalized);
-                        }}
-                        className="h-12 rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-                      />
-                    </div>
-                  </div>
-                  
-                  {cleaningLocation.trim() && (() => {
-                    const matchingItems = items.filter(item => 
-                      item.type === 'out' && 
-                      item.locations?.some(loc => 
-                        loc.name.toLowerCase().includes(cleaningLocation.toLowerCase())
-                      )
-                    );
-                    
-                    if (matchingItems.length === 0) {
-                      return (
-                        <div className="text-center py-3 text-muted-foreground bg-muted/20 rounded-xl border border-dashed text-sm">
-                          <p>No food items found with "{cleaningLocation}"</p>
-                          <p className="text-xs mt-1">Add this location to a food item first</p>
-                        </div>
-                      );
-                    }
-                    
-                    return (
-                      <div className="space-y-2">
-                        <Label>Which stall?</Label>
-                        <div className="space-y-1.5">
-                          {matchingItems.map(item => (
-                            <Button
-                              key={item.id}
-                              type="button"
-                              variant={selectedClosureFoodItem?.id === item.id ? "default" : "outline"}
-                              className="w-full h-auto py-2.5 px-3 text-left justify-start rounded-xl text-sm"
-                              onClick={() => setSelectedClosureFoodItem(
-                                selectedClosureFoodItem?.id === item.id ? null : item
-                              )}
-                            >
-                              <span className="font-medium">{item.name}</span>
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
                   
                   <Button 
                     onClick={async () => {
@@ -1414,10 +1508,49 @@ export default function AddPage() {
                       }
                     }}
                     className="w-full h-14 text-lg rounded-xl"
-                    disabled={!cleaningLocation.trim() || !selectedClosureFoodItem}
+                    disabled={selectedTimeOffDates.length === 0 || !cleaningLocation.trim() || !selectedClosureFoodItem}
                   >
                     Save
                   </Button>
+                </div>
+              )}
+              {/* Show scheduled closures list at bottom (all entries, scroll if many) */}
+              {upcomingClosuresList.length > 0 && (
+                <div className="bg-muted/30 rounded-xl p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">
+                    Scheduled Closures{upcomingClosuresList.length > 5 ? ` (${upcomingClosuresList.length} — scroll to see all)` : ''}:
+                  </p>
+                  <div className="max-h-[220px] overflow-y-scroll overflow-x-hidden rounded-md border border-transparent pr-1" style={{ scrollbarGutter: 'stable' }}>
+                    <div className="space-y-1.5 pr-1">
+                      {upcomingClosuresList.map((entry) => {
+                        if ('displayLoc' in entry) {
+                          const g = entry as CleaningGroup;
+                          return (
+                            <div key={`to-c-${g.dateRange}-${normalizeLocKey(g.displayLoc)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-blue-100 text-blue-700">
+                              <span className="min-w-0 flex-1">{g.displayLoc}</span>
+                              <span className="opacity-70 shrink-0">{g.dateRange}</span>
+                              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          );
+                        }
+                        if ('displayLabel' in entry) {
+                          const g = entry as TimeOffGroup;
+                          return (
+                            <div key={`to-t-${g.dateRange}-${normalizeLocKey(g.displayLabel)}`} className="text-xs px-2 py-1 rounded flex justify-between items-center gap-2 bg-amber-100 text-amber-700">
+                              <span className="min-w-0 flex-1">{g.displayLabel}</span>
+                              <span className="opacity-70 shrink-0">{g.dateRange}</span>
+                              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClosureGroup(g.ids)} aria-label="Delete closure">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
