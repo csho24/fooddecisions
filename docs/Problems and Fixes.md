@@ -7,7 +7,7 @@ This document tracks specific problems encountered and their solutions.
 # March 23, 2026 - Mobile location suggestion tap not applying
 
 **Date:** March 23, 2026  
-**Status:** ⚠️ Second pass (May 2026): see below; still needs phone check
+**Status:** Superseded by **May 3, 2026** entry (second pass; phone verified working).
 
 ---
 
@@ -34,6 +34,25 @@ In Food List → Quick Add (Out), typing a partial location (e.g. "marg") showed
   1. Type partial location (e.g. "marg")
   2. Tap suggestion ("Margaret Drive")
   3. Confirm field updates to full selected location
+
+---
+
+# May 3, 2026 - Mobile location suggestion tap (second pass, verified)
+
+**Date:** May 3, 2026  
+**Status:** ✅ Phone verified — tapping a suggestion now fills the full location.
+
+### Why the March 2026 fix was not enough (one-line example)
+Calling `blur()` after `setValue("Margaret Drive")` still ran `onBlur`, which read **`e.target.value` as `"marg"`** (DOM not updated yet) and wrote that back, undoing the pick.
+
+### What changed this round
+- Removed **`blur()`** after programmatic pick; apply choice via **`field.onChange` / `setValue`** only.
+- **`onPointerDown` preventDefault** on suggestion rows (touch path, not only desktop `mousedown`).
+- **`add-details.tsx`** Add Location dialog matched **`list.tsx`** (`onTouchEnd`, pointer handlers)—previously it had **`onMouseDown` only**, which phones never fire for taps like a desktop mouse.
+
+### Files
+- `client/src/pages/list.tsx`
+- `client/src/pages/add-details.tsx`
 
 ---
 
