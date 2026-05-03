@@ -1995,29 +1995,37 @@ export default function AddPage() {
                               locationNameSuggestionsRef.current = locationNameSuggestions;
                               return (
                                 <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                                  {locationNameSuggestions.map((loc, idx) => (
+                                  {locationNameSuggestions.map((loc, idx) => {
+                                    const applyLocationNamePick = () => {
+                                      const v = capitalizeWords(loc);
+                                      locationForm.setValue('name', v);
+                                      setLocationNameQuery(v);
+                                      setShowLocationNameSuggestions(false);
+                                      setHighlightLocationNameIdx(-1);
+                                    };
+                                    return (
                                     <button
                                       key={loc}
                                       type="button"
                                       className={cn(
-                                        "w-full text-left px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl",
+                                        "w-full text-left px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl touch-manipulation",
                                         idx === highlightedLocationNameIndex ? "bg-accent" : "hover:bg-accent"
                                       )}
+                                      onPointerDown={(e) => e.preventDefault()}
                                       onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => {
-                                        locationForm.setValue('name', loc);
-                                        setLocationNameQuery(loc);
-                                        setShowLocationNameSuggestions(false);
-                                        setHighlightLocationNameIdx(-1);
-                                        locationNameInputRef.current?.blur();
+                                      onTouchEnd={(e) => {
+                                        e.preventDefault();
+                                        applyLocationNamePick();
                                       }}
+                                      onClick={() => applyLocationNamePick()}
                                     >
                                       <div className="flex items-center gap-2">
                                         <MapPin className="h-4 w-4 text-muted-foreground" />
                                         <span>{loc}</span>
                                       </div>
                                     </button>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               );
                             })()}

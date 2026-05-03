@@ -7,7 +7,7 @@ This document tracks specific problems encountered and their solutions.
 # March 23, 2026 - Mobile location suggestion tap not applying
 
 **Date:** March 23, 2026  
-**Status:** ⚠️ Fix implemented, pending user phone verification
+**Status:** ⚠️ Second pass (May 2026): see below; still needs phone check
 
 ---
 
@@ -17,16 +17,17 @@ This document tracks specific problems encountered and their solutions.
 In Food List → Quick Add (Out), typing a partial location (e.g. "marg") showed suggestions correctly, but tapping a suggestion did not fill the input. The field stayed as "marg". On laptop, this worked.
 
 ### Root Cause
-Mobile tap event order differs from desktop. Input blur can fire before the suggestion click handler. Blur then commits the partially typed text and closes suggestions; the suggestion tap often never applies.
+1. **Touch event order** — On mobile, input blur can run before the suggestion’s click path finishes; the partial string can “win” unless we block default on pointer/mouse down and handle `touchEnd` on the row (same class of issue as the web’s `onMouseDown` pattern).
+2. **`blur()` + `onBlur` race** — After choosing a suggestion, code called `input.blur()`. The location field’s `onBlur` capitalizes from `e.target.value`. React may not have committed the new value to the DOM yet, so `onBlur` can overwrite the pick with the old partial text (this matches the keyboard-selection bug documented later in this file). **Do not call `blur()` after programmatically setting the location from a suggestion.**
+3. **Add Location dialog** — `client/src/pages/add-details.tsx` had `onMouseDown` only (no `onTouchEnd` / `onPointerDown`), so phone browsers did not get the same behaviour as Quick Add.
 
 ### Fix
-In `client/src/pages/list.tsx` suggestion rows:
-- Added `onMouseDown={(e) => e.preventDefault()}` to prevent early blur.
-- Added `onTouchEnd` to apply selection directly on tap for mobile reliability.
-- Kept existing click handler for desktop.
+- **`list.tsx` (Quick Add):** Suggestion rows: `onPointerDown` + `onMouseDown` `preventDefault`, `onTouchEnd` applies pick, `onClick` applies pick. `applyLocationPick` uses `field.onChange(capitalizeWords(loc))` and **does not** call `blur()`.
+- **`add-details.tsx` (Add/Edit Location):** Same row handlers; `applyLocationNamePick` does not call `blur()`.
 
 ### Files Changed
 - `client/src/pages/list.tsx`
+- `client/src/pages/add-details.tsx` (location name suggestions in the Add Location dialog)
 
 ### Verification Needed
 - User to test on phone:

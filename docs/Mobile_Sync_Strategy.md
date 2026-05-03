@@ -15,11 +15,11 @@
 
 **Issue observed on phone (web app):** In Food List Quick Add location suggestions, tapping a suggestion could leave the typed partial text (e.g. "marg") instead of applying the selected location.
 
-**Web fix implemented:** In `client/src/pages/list.tsx`, suggestion items now prevent early blur (`onMouseDown`) and apply selection on tap (`onTouchEnd`) in addition to click.
+**Web fix (iterations):** In `client/src/pages/list.tsx` and the Add Location dialog in `add-details.tsx`, suggestion rows use `onPointerDown` / `onMouseDown` `preventDefault`, `onTouchEnd` to apply the pick, and the pick path must **not** call `input.blur()` (blur triggers `onBlur`, which can read stale DOM and restore the partial query—especially on mobile). Same pattern as keyboard selection fix for Enter on suggestions.
 
-**Why this matters for mobile sync:** This is input-event ordering behavior that can differ across touch environments. When implementing/maintaining native mobile suggestion lists, test tap selection explicitly (not only keyboard/click paths).
+**Why this matters for mobile sync:** Touch ordering and blur timing differ from desktop. Native Expo screens do not yet duplicate saved-location autocomplete; if you add it, test taps and avoid blur-after-setValue races.
 
-**Status:** Pending user verification on phone. If confirmed, mirror the event-order handling principle in native mobile suggestion components.
+**Status:** Pending user verification on phone web.
 
 ---
 

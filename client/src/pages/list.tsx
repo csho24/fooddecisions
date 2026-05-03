@@ -431,20 +431,23 @@ export default function ListPage() {
                               <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
                                 {locationSuggestions.map((loc, idx) => {
                                   const applyLocationPick = () => {
-                                    form.setValue('location', loc);
-                                    setLocationQuery(loc);
+                                    const v = capitalizeWords(loc);
+                                    // Use field.onChange — do not blur(): blur fires onBlur which reads
+                                    // stale DOM before React commits, overwriting the pick (worse on mobile).
+                                    field.onChange(v);
+                                    setLocationQuery(v);
                                     setShowLocationSuggestions(false);
                                     setHighlightIdx(-1);
-                                    locationInputRef.current?.blur();
                                   };
                                   return (
                                   <button
                                     key={loc}
                                     type="button"
                                     className={cn(
-                                      "w-full text-left px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl",
+                                      "w-full text-left px-4 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl touch-manipulation",
                                       idx === highlightedLocationIndex ? "bg-accent" : "hover:bg-accent"
                                     )}
+                                    onPointerDown={(e) => e.preventDefault()}
                                     onMouseDown={(e) => e.preventDefault()}
                                     onTouchEnd={(e) => {
                                       e.preventDefault();
