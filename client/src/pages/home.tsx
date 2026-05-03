@@ -9,7 +9,6 @@ import type { FoodItem } from "@/lib/store";
 import {
   getHomeExpiryReminders,
   type ExpiryReminderItem,
-  EXPIRY_REMINDER_WINDOW_DAYS,
 } from "../../../shared/expiry-reminders";
 
 const container = {
@@ -199,7 +198,6 @@ export default function Home() {
           animate="show"
           className="grid gap-4 flex-1"
         >
-          {/* Closure Alert Banner */}
           {expiryReminders.length > 0 && (
             <motion.div
               variants={item}
@@ -209,12 +207,7 @@ export default function Home() {
                 <Clock size={18} className="text-rose-700" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground text-base mb-1">
-                  Expiring in the next {EXPIRY_REMINDER_WINDOW_DAYS} days
-                </p>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Bread is skipped (fridge/freezer dates don&apos;t match package defaults).
-                </p>
+                <p className="font-semibold text-foreground text-base mb-2">Expiring Soon</p>
                 <div className="space-y-1">
                   {expiryReminders.map((r) => (
                     <p key={r.id} className="text-rose-900 text-sm">
@@ -231,15 +224,8 @@ export default function Home() {
                       onClick={handleEnableExpiryBrowserAlerts}
                       className="mt-3 text-sm font-medium text-rose-800 underline underline-offset-2 hover:text-rose-950"
                     >
-                      Enable browser alerts (once per day when you open the app)
+                      Enable alerts
                     </button>
-                  )}
-                {typeof Notification !== "undefined" &&
-                  Notification.permission === "granted" &&
-                  expiryBrowserAlertsOn && (
-                    <p className="mt-2 text-xs text-rose-700/90">
-                      Daily browser alerts are on (when this page loads and something is due).
-                    </p>
                   )}
               </div>
             </motion.div>

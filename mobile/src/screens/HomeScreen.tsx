@@ -6,7 +6,6 @@ import { FoodItem } from '../types';
 import {
   getHomeExpiryReminders,
   type ExpiryReminderItem,
-  EXPIRY_REMINDER_WINDOW_DAYS,
 } from '../../../shared/expiry-reminders';
 
 interface HomeScreenProps {
@@ -86,19 +85,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       </View>
 
       <View style={styles.buttonsContainer}>
-        {/* Home expiry reminders (12-day window; bread excluded) */}
         {expiryReminders.length > 0 && (
           <View style={styles.expiryBanner}>
             <View style={styles.expiryBannerIcon}>
               <Ionicons name="time-outline" size={18} color="#BE123C" />
             </View>
             <View style={styles.expiryBannerContent}>
-              <Text style={styles.expiryBannerTitle}>
-                Expiring in the next {EXPIRY_REMINDER_WINDOW_DAYS} days
-              </Text>
-              <Text style={styles.expiryBannerHint}>
-                Bread is skipped (fridge dates often don't match the package).
-              </Text>
+              <Text style={styles.expiryBannerTitle}>Expiring Soon</Text>
               {expiryReminders.map((r) => (
                 <Text key={r.id} style={styles.expiryBannerLine}>
                   <Text style={styles.expiryBannerName}>{r.name}</Text>
@@ -387,13 +380,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#9F1239',
-    marginBottom: 4,
-  },
-  expiryBannerHint: {
-    fontSize: 11,
-    color: '#9CA3AF',
     marginBottom: 8,
-    lineHeight: 14,
   },
   expiryBannerLine: {
     fontSize: 14,

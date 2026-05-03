@@ -1,7 +1,4 @@
-/**
- * Home-screen expiry reminders: items in the last 12 days before expiry.
- * Bread is excluded (often frozen/fridge-stored with misleading package dates).
- */
+/** Home-screen expiry reminders: home items expiring within the configured day window. */
 
 export const EXPIRY_REMINDER_WINDOW_DAYS = 12;
 
@@ -19,7 +16,6 @@ export interface ExpiryReminderItem {
   expiryDate: string;
 }
 
-/** Whole-word match so e.g. "gingerbread" is not excluded. */
 export function isExcludedFromExpiryReminder(name: string): boolean {
   return /\bbread\b/i.test(name.trim());
 }
@@ -34,9 +30,6 @@ export function getDaysRemaining(expiryDateIso: string): number | null {
   return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-/**
- * Home items expiring in 1..12 days (inclusive), excluding bread.
- */
 export function getHomeExpiryReminders(items: HomeExpiryItemInput[]): ExpiryReminderItem[] {
   const out: ExpiryReminderItem[] = [];
   for (const item of items) {
