@@ -1,11 +1,16 @@
 import { Layout } from "@/components/mobile-layout";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Utensils, List, Plus, ChefHat, Store, AlertCircle } from "lucide-react";
+import { Utensils, List, Plus, AlertCircle, Clock } from "lucide-react";
 import bgPattern from "@assets/generated_images/subtle_abstract_food_pattern_background.png";
 import { useEffect, useMemo, useState } from "react";
 import { getClosureSchedules, ClosureSchedule, getFoods } from "@/lib/api";
 import type { FoodItem } from "@/lib/store";
+import {
+  getHomeExpiryReminders,
+  type ExpiryReminderItem,
+  EXPIRY_REMINDER_WINDOW_DAYS,
+} from "../../../shared/expiry-reminders";
 
 const container = {
   hidden: { opacity: 0 },
@@ -27,10 +32,20 @@ interface RegularClosure {
   locationName: string | null;
 }
 
+const FC_EXPIRY_NOTIF_ENABLED = "fc-expiry-notif-enabled";
+const FC_EXPIRY_NOTIF_LAST = "fc-expiry-notif-last";
+
 export default function Home() {
   const [todaysClosures, setTodaysClosures] = useState<ClosureSchedule[]>([]);
   const [allClosures, setAllClosures] = useState<ClosureSchedule[]>([]);
   const [regularClosuresToday, setRegularClosuresToday] = useState<RegularClosure[]>([]);
+  const [expiryReminders, setExpiryReminders] = useState<ExpiryReminderItem[]>([]);
+  const [expiryBrowserAlertsOn, setExpiryBrowserAlertsOn] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setExpiryBrowserAlertsOn(localStorage.getItem(FC_EXPIRY_NOTIF_ENABLED) === "1");
+  }, []);
 
   useEffect(() => {
     // Fetch scheduled closures and filter for today
@@ -51,6 +66,8 @@ export default function Home() {
     // Fetch food items and compute regular weekly closures
     getFoods()
       .then((items: FoodItem[]) => {
+        setExpiryReminders(getHomeExpiryReminders(items));
+
         const todayDow = new Date().getDay(); // 0=Sunday, 1=Monday, ...
         const result: RegularClosure[] = [];
 
@@ -82,6 +99,37 @@ export default function Home() {
       })
       .catch(err => console.error('Failed to fetch foods for closure check:', err));
   }, []);
+
+  // Browser notification (optional): once per day when user opted in and items are due
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof Notification === "undefined") return;
+    if (expiryReminders.length === 0) return;
+    if (Notification.permission !== "granted") return;
+    if (localStorage.getItem(FC_EXPIRY_NOTIF_ENABLED) !== "1") return;
+    const today = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem(FC_EXPIRY_NOTIF_LAST) === today) return;
+    const body = expiryReminders
+      .slice(0, 5)
+      .map((r) => `${r.name} (${r.daysRemaining}d)`)
+      .join(" · ");
+    // Set first so React Strict Mode / double effect does not show two toasts
+    localStorage.setItem(FC_EXPIRY_NOTIF_LAST, today);
+    try {
+      new Notification("Food Compass — expiring soon", { body, tag: "fc-expiry" });
+    } catch {
+      /* ignore */
+    }
+  }, [expiryReminders, expiryBrowserAlertsOn]);
+
+  async function handleEnableExpiryBrowserAlerts() {
+    if (typeof Notification === "undefined") return;
+    const p = await Notification.requestPermission();
+    if (p === "granted") {
+      localStorage.setItem(FC_EXPIRY_NOTIF_ENABLED, "1");
+      localStorage.removeItem(FC_EXPIRY_NOTIF_LAST);
+      setExpiryBrowserAlertsOn(true);
+    }
+  }
 
   const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -152,6 +200,51 @@ export default function Home() {
           className="grid gap-4 flex-1"
         >
           {/* Closure Alert Banner */}
+          {expiryReminders.length > 0 && (
+            <motion.div
+              variants={item}
+              className="bg-rose-50 border border-rose-200/80 rounded-2xl p-4 flex items-start gap-3"
+            >
+              <div className="bg-rose-100 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Clock size={18} className="text-rose-700" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-foreground text-base mb-1">
+                  Expiring in the next {EXPIRY_REMINDER_WINDOW_DAYS} days
+                </p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Bread is skipped (fridge/freezer dates don&apos;t match package defaults).
+                </p>
+                <div className="space-y-1">
+                  {expiryReminders.map((r) => (
+                    <p key={r.id} className="text-rose-900 text-sm">
+                      <span className="font-medium">{r.name}</span>
+                      <span className="text-rose-700"> — {r.daysRemaining}d left</span>
+                    </p>
+                  ))}
+                </div>
+                {typeof Notification !== "undefined" &&
+                  expiryReminders.length > 0 &&
+                  Notification.permission === "default" && (
+                    <button
+                      type="button"
+                      onClick={handleEnableExpiryBrowserAlerts}
+                      className="mt-3 text-sm font-medium text-rose-800 underline underline-offset-2 hover:text-rose-950"
+                    >
+                      Enable browser alerts (once per day when you open the app)
+                    </button>
+                  )}
+                {typeof Notification !== "undefined" &&
+                  Notification.permission === "granted" &&
+                  expiryBrowserAlertsOn && (
+                    <p className="mt-2 text-xs text-rose-700/90">
+                      Daily browser alerts are on (when this page loads and something is due).
+                    </p>
+                  )}
+              </div>
+            </motion.div>
+          )}
+
           {(closureBannerLines.length > 0 || regularClosuresToday.length > 0) && (
             <motion.div 
               variants={item}

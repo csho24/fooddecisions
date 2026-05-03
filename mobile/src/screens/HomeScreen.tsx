@@ -3,6 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { getClosureSchedules, ClosureSchedule, getFoods } from '../api';
 import { FoodItem } from '../types';
+import {
+  getHomeExpiryReminders,
+  type ExpiryReminderItem,
+  EXPIRY_REMINDER_WINDOW_DAYS,
+} from '../../../shared/expiry-reminders';
 
 interface HomeScreenProps {
   navigation: any;
@@ -16,6 +21,7 @@ interface RegularClosure {
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [todaysClosures, setTodaysClosures] = useState<ClosureSchedule[]>([]);
   const [regularClosuresToday, setRegularClosuresToday] = useState<RegularClosure[]>([]);
+  const [expiryReminders, setExpiryReminders] = useState<ExpiryReminderItem[]>([]);
 
   useEffect(() => {
     // Fetch scheduled closures and filter for today
@@ -35,6 +41,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     // Fetch food items and compute regular weekly closures
     getFoods()
       .then((items: FoodItem[]) => {
+        setExpiryReminders(getHomeExpiryReminders(items));
+
         const todayDow = new Date().getDay(); // 0=Sunday, 1=Monday, ...
         const result: RegularClosure[] = [];
 
@@ -78,6 +86,29 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       </View>
 
       <View style={styles.buttonsContainer}>
+        {/* Home expiry reminders (12-day window; bread excluded) */}
+        {expiryReminders.length > 0 && (
+          <View style={styles.expiryBanner}>
+            <View style={styles.expiryBannerIcon}>
+              <Ionicons name="time-outline" size={18} color="#BE123C" />
+            </View>
+            <View style={styles.expiryBannerContent}>
+              <Text style={styles.expiryBannerTitle}>
+                Expiring in the next {EXPIRY_REMINDER_WINDOW_DAYS} days
+              </Text>
+              <Text style={styles.expiryBannerHint}>
+                Bread is skipped (fridge dates often don't match the package).
+              </Text>
+              {expiryReminders.map((r) => (
+                <Text key={r.id} style={styles.expiryBannerLine}>
+                  <Text style={styles.expiryBannerName}>{r.name}</Text>
+                  <Text style={styles.expiryBannerDays}> — {r.daysRemaining}d left</Text>
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Closure Alert Banner */}
         {(todaysClosures.length > 0 || regularClosuresToday.length > 0) && (
           <View style={styles.closureBanner}>
@@ -330,5 +361,50 @@ const styles = StyleSheet.create({
   closureBannerRegular: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  expiryBanner: {
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  expiryBannerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFE4E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expiryBannerContent: {
+    flex: 1,
+  },
+  expiryBannerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9F1239',
+    marginBottom: 4,
+  },
+  expiryBannerHint: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginBottom: 8,
+    lineHeight: 14,
+  },
+  expiryBannerLine: {
+    fontSize: 14,
+    color: '#881337',
+  },
+  expiryBannerName: {
+    fontWeight: '600',
+    color: '#881337',
+  },
+  expiryBannerDays: {
+    fontWeight: '400',
+    color: '#BE123C',
   },
 });
