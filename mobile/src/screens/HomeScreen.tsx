@@ -77,9 +77,17 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <Ionicons
+          name="restaurant"
+          size={120}
+          color="#F97316"
+          style={styles.headerBgIcon}
+        />
         <View style={styles.titleRow}>
           <Text style={styles.title}>Food{'\n'}Decisions</Text>
-          <Ionicons name="sparkles" size={20} color="#F97316" style={styles.sparkle} />
+          <View style={styles.titleIconWrap}>
+            <Ionicons name="restaurant" size={28} color="#F97316" />
+          </View>
         </View>
         <Text style={styles.subtitle}>what and where shall we eat today?</Text>
       </View>
@@ -94,8 +102,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               <Text style={styles.expiryBannerTitle}>Expiring Soon</Text>
               {expiryReminders.map((r) => (
                 <Text key={r.id} style={styles.expiryBannerLine}>
-                  <Text style={styles.expiryBannerName}>{r.name}</Text>
-                  <Text style={styles.expiryBannerDays}> — {r.daysRemaining}d left</Text>
+                  {r.name} — {r.daysRemaining}d left
                 </Text>
               ))}
             </View>
@@ -199,13 +206,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   header: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 24,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  headerBgIcon: {
+    position: 'absolute',
+    right: -16,
+    top: 32,
+    opacity: 0.07,
+    transform: [{ rotate: '-12deg' }],
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: 10,
   },
   title: {
     fontSize: 40,
@@ -213,16 +230,22 @@ const styles = StyleSheet.create({
     color: '#F97316',
     lineHeight: 44,
     letterSpacing: -1,
+    flexShrink: 1,
   },
-  sparkle: {
-    marginLeft: 8,
-    marginTop: 4,
-    opacity: 0.6,
+  titleIconWrap: {
+    marginTop: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(249, 115, 22, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   subtitle: {
     fontSize: 18,
     color: '#6B7280',
     marginTop: 8,
+    paddingRight: 8,
   },
   buttonsContainer: {
     flex: 1,
@@ -325,6 +348,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
+    width: '100%',
   },
   closureBannerIcon: {
     width: 32,
@@ -333,9 +357,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   closureBannerContent: {
     flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
   },
   closureBannerTitle: {
     fontSize: 14,
@@ -364,6 +391,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
+    width: '100%',
   },
   expiryBannerIcon: {
     width: 32,
@@ -372,9 +400,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFE4E6',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   expiryBannerContent: {
     flex: 1,
+    minWidth: 0,
+    alignSelf: 'stretch',
   },
   expiryBannerTitle: {
     fontSize: 14,
@@ -384,14 +415,8 @@ const styles = StyleSheet.create({
   },
   expiryBannerLine: {
     fontSize: 14,
+    fontWeight: '500',
     color: '#881337',
-  },
-  expiryBannerName: {
-    fontWeight: '600',
-    color: '#881337',
-  },
-  expiryBannerDays: {
-    fontWeight: '400',
-    color: '#BE123C',
+    marginBottom: 4,
   },
 });

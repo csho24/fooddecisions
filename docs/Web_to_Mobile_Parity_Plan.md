@@ -178,7 +178,7 @@ Overall: **you can use mobile for basics** (lists, expiry banner, closure create
 **`mobile/src/screens/AddInfoScreen.tsx`** (closure / time off) — doc steps still apply; confirmed in code:
 
 - [ ] **Multi-date:** `if (isDateSaved(date, type)) return` still blocks re-select (~155)
-- [ ] **Remove “Past closures” list section** (~920+) to match web
+- [x] **Remove “Past closures” list section** — done June 4, 2026 (past dates remain on calendar only)
 - [ ] **Time off:** past dates still disabled via `isPast` pattern (~848–886 area)
 - [ ] **Selected dates banner**, **time-off range text**, **buildTimeOffGroups** / grouped scheduled list, **combo day colors**, **dark blue = 2+ locations**, duplicate-date filter on save, cross-month range labels, etc. — see §0c checklist (unchanged)
 

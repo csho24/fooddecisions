@@ -118,7 +118,6 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
   const upcomingClosures = savedClosures.filter((c: ClosureSchedule) => c.date >= todayStr);
-  const pastClosures = savedClosures.filter((c: ClosureSchedule) => c.date < todayStr);
 
   // Resolve display location: use full location name from food item when available
   const getClosureDisplayLocation = (c: ClosureSchedule): string => {
@@ -885,43 +884,6 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
             <View style={styles.closuresList}>
               <Text style={styles.closuresListTitle}>Scheduled Closures:</Text>
               {upcomingClosures.slice(0, 8).map((c) => {
-                const displayLoc = getClosureDisplayLocation(c);
-                return (
-                  <View key={c.id} style={[
-                    styles.closureItem,
-                    c.type === 'cleaning' ? styles.closureItemCleaning : styles.closureItemTimeoff,
-                    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }
-                  ]}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={[
-                        styles.closureItemText,
-                        c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
-                      ]} numberOfLines={1}>
-                        {displayLoc && c.foodItemName 
-                          ? `${displayLoc} › ${c.foodItemName}` 
-                          : c.foodItemName || displayLoc}
-                      </Text>
-                      <Text style={[
-                        styles.closureItemDate,
-                        c.type === 'cleaning' ? styles.closureTextCleaning : styles.closureTextTimeoff
-                      ]}>
-                        {c.date.split('-')[2]}/{c.date.split('-')[1]} • {c.type === 'cleaning' ? 'Clean' : 'Off'}
-                      </Text>
-                    </View>
-                    <TouchableOpacity onPress={() => handleDeleteClosure(c.id)} style={{ padding: 8 }} accessibilityLabel="Delete closure">
-                      <Ionicons name="trash-outline" size={18} color="#b91c1c" />
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          {/* Past closures (with delete) */}
-          {pastClosures.length > 0 && (
-            <View style={[styles.closuresList, { backgroundColor: 'rgba(0,0,0,0.04)', marginTop: 8 }]}>
-              <Text style={[styles.closuresListTitle, { marginBottom: 8 }]}>Past closures</Text>
-              {pastClosures.slice(0, 20).map((c) => {
                 const displayLoc = getClosureDisplayLocation(c);
                 return (
                   <View key={c.id} style={[
