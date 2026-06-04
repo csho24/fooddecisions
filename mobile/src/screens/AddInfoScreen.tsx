@@ -112,6 +112,37 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
     return savedClosures.find(c => c.date === dateStr);
   };
 
+  const toDateStr = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  /** Match web: dark blue only when 2+ distinct locations on same cleaning date. */
+  const getCleaningLocationCountForDate = (date: Date): number => {
+    const dateStr = toDateStr(date);
+    const locKeys = new Set(
+      savedClosures
+        .filter((c) => c.type === 'cleaning' && c.date === dateStr)
+        .map((c) => normalizeLocKey(getClosureDisplayLocation(c)))
+    );
+    locKeys.delete('');
+    return locKeys.size;
+  };
+
+  /** Match web: dark orange when 2+ distinct time-off stalls on same date. */
+  const getTimeOffEntryCountForDate = (date: Date): number => {
+    const dateStr = toDateStr(date);
+    const keys = new Set(
+      savedClosures
+        .filter((c) => c.type === 'timeoff' && c.date === dateStr)
+        .map((c) => `${normalizeLocKey(c.location ?? '')}|${normalizeLocKey(c.foodItemName ?? '')}`)
+    );
+    keys.delete('|');
+    return keys.size;
+  };
+
   // Only show future/current closures in the "Scheduled Closures" list (past stay on calendar)
   const todayStr = (() => {
     const d = new Date();
@@ -727,7 +758,6 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
   // Cleaning/Time Off Calendar Screen
   if (mainStep === 'cleaning' || mainStep === 'timeoff') {
     const closureType = mainStep;
-    const otherType = closureType === 'cleaning' ? 'timeoff' : 'cleaning';
     const calendarDays = getCalendarDays();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -844,35 +874,67 @@ export default function AddInfoScreen({ navigation, route }: AddInfoScreenProps)
                   return <View key={`empty-${index}`} style={styles.dayCell} />;
                 }
 
-                const isPast = closureType === 'timeoff' && date < today;
-                const isSavedCurrent = isDateSaved(date, closureType);
-                const isSavedOther = isDateSaved(date, otherType);
-                const isSelected = isDateSelected(date);
-                const closure = getClosureForDate(date);
-                const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+                // Match web add-details.tsx: both cleaning + timeoff modifiers on the same calendar
+                const isCleaning =
+                  isDateSaved(date, 'cleaning') ||
+                  (closureType === 'cleaning' && isDateSelected(date));
+                const isTimeoff =
+                  isDateSaved(date, 'timeoff') ||
+                  (closureType === 'timeoff' && isDateSelected(date));
+                const both = isCleaning && isTimeoff;
+                const isSelectedOnTab = isDateSelected(date);
+                const isToday =
+                  date.getDate() === today.getDate() &&
+                  date.getMonth() === today.getMonth() &&
+                  date.getFullYear() === today.getFullYear();
+                const darkBlue =
+                  isCleaning && !both && getCleaningLocationCountForDate(date) >= 2;
+                const darkOrange =
+                  isTimeoff && !both && getTimeOffEntryCountForDate(date) >= 2;
+
+                const dayNumber = date.getDate();
+                const textStyle = [
+                  styles.dayText,
+                  (isCleaning || isTimeoff) && styles.dayTextOnColor,
+                  isToday && styles.dayTextToday,
+                  isToday && (isCleaning || isTimeoff) && styles.dayTextTodayOnColor,
+                ];
+
+                if (both) {
+                  return (
+                    <TouchableOpacity
+                      key={date.toISOString()}
+                      style={[styles.dayCell, isSelectedOnTab && styles.dayCellRing]}
+                      onPress={() => toggleDateSelection(date, closureType)}
+                    >
+                      <View style={styles.dayCellComboWrap}>
+                        <View style={styles.dayCellComboRow}>
+                          <View style={[styles.dayCellComboHalf, styles.dayCellCleaning]} />
+                          <View style={[styles.dayCellComboHalf, styles.dayCellTimeoff]} />
+                        </View>
+                      </View>
+                      <Text style={textStyle}>{dayNumber}</Text>
+                    </TouchableOpacity>
+                  );
+                }
+
+                const fillStyle = isCleaning
+                  ? darkBlue
+                    ? styles.dayCellCleaningDark
+                    : styles.dayCellCleaning
+                  : isTimeoff
+                    ? darkOrange
+                      ? styles.dayCellTimeoffDark
+                      : styles.dayCellTimeoff
+                    : undefined;
 
                 return (
                   <TouchableOpacity
                     key={date.toISOString()}
-                    style={[
-                      styles.dayCell,
-                      isSelected && styles.dayCellSelected,
-                      isSavedCurrent && (closureType === 'cleaning' ? styles.dayCellCleaning : styles.dayCellTimeoff),
-                      isSavedOther && (closureType === 'cleaning' ? styles.dayCellTimeoff : styles.dayCellCleaning),
-                      isPast && styles.dayCellDisabled,
-                    ]}
-                    onPress={() => !isPast && toggleDateSelection(date, closureType)}
-                    disabled={isPast}
+                    style={[styles.dayCell, fillStyle, isSelectedOnTab && styles.dayCellRing]}
+                    onPress={() => toggleDateSelection(date, closureType)}
                   >
-                    <Text style={[
-                      styles.dayText,
-                      isSelected && styles.dayTextSelected,
-                      (isSavedCurrent || isSavedOther) && styles.dayTextSaved,
-                      isPast && styles.dayTextDisabled,
-                      isToday && styles.dayTextToday,
-                    ]}>
-                      {date.getDate()}
-                    </Text>
+                    <Text style={textStyle}>{dayNumber}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -1639,44 +1701,62 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 4,
   },
   dayCell: {
-    width: '14.28%',
+    width: '13.5%',
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 12,
+    marginBottom: 4,
+    overflow: 'hidden',
   },
-  dayCellSelected: {
-    backgroundColor: '#111827',
+  dayCellRing: {
+    borderWidth: 2,
+    borderColor: '#f97316',
   },
   dayCellCleaning: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#60a5fa',
+  },
+  dayCellCleaningDark: {
+    backgroundColor: '#1e40af',
   },
   dayCellTimeoff: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#f59e0b',
   },
-  dayCellDisabled: {
-    opacity: 0.3,
+  dayCellTimeoffDark: {
+    backgroundColor: '#b45309',
+  },
+  dayCellComboWrap: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  dayCellComboRow: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  dayCellComboHalf: {
+    flex: 1,
   },
   dayText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#111827',
+    zIndex: 1,
   },
-  dayTextSelected: {
-    color: '#FFFFFF',
-  },
-  dayTextSaved: {
-    color: '#FFFFFF',
-  },
-  dayTextDisabled: {
-    color: '#9CA3AF',
+  dayTextOnColor: {
+    color: '#000000',
+    fontWeight: '600',
   },
   dayTextToday: {
     color: '#15803D',
     fontWeight: '700',
     fontSize: 16,
+  },
+  dayTextTodayOnColor: {
+    color: '#14532d',
   },
   closuresList: {
     marginTop: 16,
