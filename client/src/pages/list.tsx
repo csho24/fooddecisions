@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { capitalizeWords } from "../../../shared/utils";
+import { compareHomeFoodListItems } from "../../../shared/home-list-sort";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
@@ -159,15 +160,13 @@ export default function ListPage() {
     return { thisWeek, thisMonth, thisYear };
   }, [thrownItems]);
 
-  // Sort items
-  const sortedItems = filteredItems.sort((a, b) => {
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    if (filter === 'home') return compareHomeFoodListItems(a, b);
     const aExpiry = a.expiryDate ? new Date(a.expiryDate).getTime() : null;
     const bExpiry = b.expiryDate ? new Date(b.expiryDate).getTime() : null;
-    // Items with expiry dates come first, sorted soonest-first
     if (aExpiry !== null && bExpiry !== null) return aExpiry - bExpiry;
     if (aExpiry !== null) return -1;
     if (bExpiry !== null) return 1;
-    // No expiry on either: alphabetical
     return a.name.localeCompare(b.name);
   });
 

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useFoodStore } from '../store';
 import { FoodType, FoodItem } from '../types';
+import { compareHomeFoodListItems } from '../../../shared/home-list-sort';
 
 interface FoodListsScreenProps {
   navigation: any;
@@ -48,9 +49,11 @@ export default function FoodListsScreen({ navigation, route }: FoodListsScreenPr
     }, [route.params?.activeTab])
   );
 
-  const filteredItems = items
-    .filter(item => item.type === activeTab)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const filteredItems = items.filter(item => item.type === activeTab);
+  const sortedItems =
+    activeTab === 'home'
+      ? [...filteredItems].sort(compareHomeFoodListItems)
+      : [...filteredItems].sort((a, b) => a.name.localeCompare(b.name));
   const homeCategories = ['Fridge', 'Snacks'];
 
   const handleAddItem = async () => {
@@ -97,9 +100,9 @@ export default function FoodListsScreen({ navigation, route }: FoodListsScreenPr
 
   const groupedHomeItems = activeTab === 'home'
     ? homeCategories.reduce((acc, cat) => {
-        acc[cat] = filteredItems.filter(item => item.category === cat);
+        acc[cat] = sortedItems.filter(item => item.category === cat);
         return acc;
-      }, {} as Record<string, typeof filteredItems>)
+      }, {} as Record<string, typeof sortedItems>)
     : {};
 
   const renderHomeItem = (item: FoodItem) => {
@@ -211,7 +214,7 @@ export default function FoodListsScreen({ navigation, route }: FoodListsScreenPr
       </KeyboardAvoidingView>
 
       <FlatList
-        data={activeTab === 'home' ? [] : filteredItems}
+        data={activeTab === 'home' ? [] : sortedItems}
         keyExtractor={item => item.id}
         style={styles.list}
         ListHeaderComponent={
