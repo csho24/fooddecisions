@@ -1,8 +1,46 @@
 # Web-to-Mobile Parity Plan
 
+## June 4, 2026 — Session log (mobile design & polish; end of day)
+
+**What we did today (mobile only unless noted):**
+
+| Area | Done |
+|------|------|
+| **Food List** | Quick Add (W1/W2): Home/Out, Out location required + saved-location suggestions; sage **Home** card colour; orange/emerald row icons; Quick Add **collapsed by default**; smaller green add buttons; **no header back arrows** on list + item edit (system/gesture back); Home edit = Fridge/Snacks only, Save Changes, no Delete, name→underline spacing; Out edit = locations + food categories, Delete, extra top padding for name |
+| **Home** | “Closed Today” banner layout (icon + text column); big home cards left as-is (user happy with tap size) |
+| **Add Info — closures** | Calendar legend above weekday row; combo day colour (half blue / half amber); grouped **Scheduled Closures** list via `shared/business-logic`; **removed “Past closures” list** (past dates stay on calendar) |
+| **Add Info — hub UI** | **Add Info** landing: **no top back arrow** (use system back to Home); **titles moved below notch** — `SafeAreaProvider` in `App.tsx` + `useSafeAreaInsets` header padding on Add Info / Closure / Expiry (and cleaning/time-off calendar) |
+| **Add Info — cleaning location** | Web parity: “X stalls identified…”, orange **Mark all** button, **Select specific stalls** (scrollable list; Cancel/Save below list); location matching (`Clementi` → hawker name); skip already-saved cleaning dates |
+| **Mobile keyboard UX** | Cleaning/time-off: `KeyboardAvoidingView` + scroll focused field into view — **any screen with bottom `TextInput` must keep the field visible above the keyboard** (standard app expectation) |
+| **Expo** | `metro.config.js` for `shared/` imports; reload tips in `docs/Loading_on_Expo_Go_Troubleshooting.md` |
+
+**Still open (function > design):**
+
+- **Decide** — Location/Food tabs, drill-down, closed-today styling (§2.3; **largest gap** — not started on mobile).
+- **Add Info calendar (time off + polish)** — multi-date select, time-off range text, grouped time-off list, selected-dates banner, past dates selectable on time off, dark blue = 2+ locations, orange rings on selected days, etc. (§0c / §0d). **Cleaning location + mass/single stall save ≈ web** (June 4); rest of calendar backlog remains.
+- **Home closure banner** — blue cleaning / amber time off; “time off until …”; dedup vs weekly closed (§0 #8, §0d #9–11).
+- **Add Location dialog (W6)** — location suggestions when editing Out item locations (same tap rules as Quick Add).
+- **Polish optional:** `capitalizeWords` on blur/save (imported but not always applied); Food Wasted screen; native expiry push (W5); archive stats on list; many buttons still default **black** on mobile (cosmetic).
+
+**Honest status (June 4, 2026):** We have **not** done everything. Daily-use paths (home, food lists, quick add, expiry, basic closures, cleaning-by-location) are in good shape after today. **Decide**, **full calendar/time-off parity**, and **home banner colours/copy** are still real gaps vs web. Anything marked ✅ here or in §0e should still be **spot-checked on a real phone** (Expo Go) — bugs may exist that we have not hit yet; that is normal until you test each flow once.
+
+**Be careful next session:**
+
+- **Home vs Out item edit** — do not add Out fields to Home or vice versa; Home has no Delete by design.
+- **Back arrows** — Food List flow uses system back only; Add Info **hub** has no back arrow; **inside** Add Info (Closure → Cleaning, Expiry steps) still uses header back for in-flow navigation.
+- **Safe area** — hub screens use manual `insets.top + 16` on the header; need `SafeAreaProvider` at app root or titles sit under the camera/notch.
+- **Keyboard** — when adding bottom inputs (closure location, Quick Add, etc.), use `KeyboardAvoidingView` and/or scroll-to-focused-field so the user can always see what they type; Android may need `softwareKeyboardLayoutMode: "resize"` in `mobile/app.config.js`.
+- **Select specific stalls** — stall checklist is a **bounded `ScrollView`**; Cancel/Save sit **below** the list (not inside the scroll), matching web.
+- **Do not clear local storage** (user rule).
+- **Web** — do not change unless asked; verify behaviour in `client/src` before “fixing” mobile from old doc rows.
+
+**Design note:** Mobile intentionally uses **larger cards and tap targets** than web (user preference). Remaining gaps are mostly **behaviour/calendar/Decide**, not making mobile look like a desktop site.
+
+---
+
 **Purpose:** Bring the mobile app in line with recent web changes. Web is the primary test surface; changes should be transferred to mobile so both behave the same.
 
-**Last updated:** June 4, 2026 (§Foundational rules; W1 Food List Quick Add done on mobile)
+**Last updated:** June 4, 2026 (session log; pushed end-of-day — Food List polish, Add Info hub/cleaning/keyboard; not full parity)
 
 **Note:** Some business logic functions are now shared in `shared/` folder:
 - ✅ `shared/utils.ts` - capitalizeWords, normalizeLocKey
@@ -44,8 +82,9 @@ Both web and mobile **can** import from these shared files; not every screen use
 3. **Check mobile** for what already exists; reuse `shared/` if present.
 4. **Implement in `mobile/src/` only** (add `mobile/src/hooks/` etc. as needed). Mirror **behaviour**, not line-by-line JSX.
 5. **RN input / suggestions:** When copying web location autocomplete, taps must **set state on press** and **not** rely on `blur()` before the value commits (see `docs/Problems and Fixes.md` May 3, 2026). Use `Pressable`/`TouchableOpacity` `onPress` to apply pick; optional `onPressIn` to keep keyboard; delay hiding suggestions ~200ms on `TextInput` `onBlur` if needed.
-6. **Test on Expo Go** (or simulator) for that slice only; do not refactor unrelated screens.
-7. **Update §0e** (and the slice row): mark ✅ with date or note “done”; do not remove historical §0c detail.
+6. **Keyboard visibility:** Bottom `TextInput` fields must stay visible while typing (`KeyboardAvoidingView`, scroll on focus, extra scroll padding). Users expect to see the field and label above the keyboard — same as native apps.
+7. **Test on Expo Go** (or simulator) for that slice only; do not refactor unrelated screens.
+8. **Update §0e** (and the slice row): mark ✅ with date or note “done”; do not remove historical §0c detail.
 
 ### 4. What “identical” means (so expectations are clear)
 
@@ -106,13 +145,14 @@ Everything we changed on web in this chat is listed below with **Applied to mobi
 | 5 | **Cleaning = mass-select:** No “Which stall?”; type location → all stalls at that location; “Mark all X stalls closed” button | ✅ Yes | None. |
 | 6 | **Remove middle banner (cleaning):** No summary box above button; only instruction + button | ✅ Yes | None. |
 | 7 | **Button text:** “Mark all X stalls closed” (no “Save —”), capital M | ✅ Yes | None. |
-| 8 | **Colors:** Cleaning = blue, time off = amber (list rows, calendar modifiers, home banner lines) | ⚠️ Partial | Add Info: ✅. **Home banner: ❌** – mobile still all amber; add blue for cleaning lines in `HomeScreen.tsx`. |
+| 8 | **Colors:** Cleaning = blue, time off = amber (list rows, calendar modifiers, home banner lines) | ⚠️ Partial | Add Info list + calendar: ✅. **Home banner: ❌** – mobile still all amber; add blue for cleaning lines in `HomeScreen.tsx`. |
+| — | **Add Info hub safe area + back** | ✅ June 4, 2026 | Landing: no header back (system back to Home); titles use `useSafeAreaInsets` so not under camera/notch. |
 | 9 | **Location input (closure):** Focus ring inset so edges don’t clip; `px-1` wrapper; label aligned with input | N/A (web only) | Low: if mobile location input feels misaligned, add matching horizontal padding. |
 | 10 | **Decide – hide header back:** When drilled into Go Out → Food (category) or Go Out → Location (location), hide header back; only “Back to Categories” / “Back to Locations” | ❌ No | Mobile Decide doesn’t have Location/Food drill yet; when you add it (section 2.3), also hide header back when drilled in. |
 | 11 | **Calendar multi-date selection:** Can select multiple dates (including saved dates) - orange border persists on all selected dates | ❌ No | **CRITICAL:** See section 0c below for detailed steps. |
 | 12 | **Calendar dark blue logic:** Dark blue only for 2+ distinct locations (not 2+ stalls) | ❌ No | **CRITICAL:** See section 0c below for detailed steps. |
 | 13 | **Location capitalization normalization:** Prevent duplicates like "Margaret Drive" vs "Margaret drive" | ❌ No | **CRITICAL:** See section 0c below for detailed steps. |
-| 14 | **Past closures removed:** Removed "Past closures" sections from UI (past dates still visible on calendar) | ⚠️ Partial | Mobile still has "Past closures" section - remove it to match web. |
+| 14 | **Past closures removed:** Removed "Past closures" sections from UI (past dates still visible on calendar) | ✅ June 4, 2026 | None. |
 | 15 | **Past dates selectable in Time Off:** Past dates no longer disabled in Time Off calendar | ❌ No | Mobile still disables past dates () - remove this restriction. |
 | 16 | **Selected dates banner:** Shows "2 days — 9 Feb, 10 Feb" under calendar when dates selected | ❌ No | Add banner showing selected dates count and list. |
 | 17 | **getClosureDisplayLocation exact match:** Uses exact match (case-insensitive) instead of includes() to prevent wrong location display | ❌ No | **CRITICAL:** See section 0c below for detailed steps. |
@@ -139,9 +179,9 @@ Everything we changed on web in this chat is listed below with **Applied to mobi
 |------|-------------|----------------|-----|
 | **Home – Expiring Soon** | Banner + optional browser “Enable alerts” | In-app banner only (shared logic) | Small (native push optional later) |
 | **Home – Closed Today** | Blue cleaning / amber time off; time off “until …”; dedup vs weekly closed | All amber; simpler lines; no “until” / dedup | Medium |
-| **Food List – Home** | Quick Add; leftover-first + expiry sort; archive stats | Name-only add; **same sort** via shared module; archive modal ✅ | Medium (Quick Add missing) |
-| **Food List – Out** | Quick Add + **location required** + saved-location suggestions | Name-only add; **no location** on add | **Large** |
-| **Add Info / closures** | Full calendar/time-off UX (grouped lists, range input, combo colors, no “Past closures” list UI) | Older calendar; **Past closures** section still present; many 0c/0d items open | **Large** |
+| **Food List – Home** | Quick Add; leftover-first + expiry sort; archive stats | Quick Add ✅; same sort; sage card; item edit polish ✅ | Small (archive stats optional) |
+| **Food List – Out** | Quick Add + **location required** + saved-location suggestions | Quick Add + locations ✅ (W1); item edit polish ✅ | Small (W6 location dialog suggestions) |
+| **Add Info / closures** | Full calendar/time-off UX (grouped lists, range input, combo colors, no “Past closures” list UI) | Combo colours + grouped scheduled list + no past list ✅; hub safe area ✅; many §0c calendar items still open | **Medium–Large** |
 | **Decide** | Location/Food tabs, drill-down, closed-today styling | Flat SectionList by location only | **Largest** |
 | **Food Wasted** | Dedicated page | No screen | Optional |
 
@@ -154,7 +194,7 @@ Overall: **you can use mobile for basics** (lists, expiry banner, closure create
 | Older doc claim | Actual code (June 2026) |
 |-----------------|-------------------------|
 | §0d #14 — mobile Home list has no expiry-first sort | ❌ Stale — `FoodListsScreen.tsx` sorts with `compareHomeFoodListItems` (`shared/home-list-sort.ts`): **leftovers first**, then soonest expiry, then name |
-| §2.5 — “Upcoming vs past closures ✅ Same” on mobile | ⚠️ Misleading — mobile still renders a **“Past closures”** list block (`AddInfoScreen.tsx` ~920+). Web has **no** “Past closures” heading in UI (past dates stay on the calendar only) |
+| §2.5 — “Upcoming vs past closures ✅ Same” on mobile | ✅ **Fixed June 4, 2026** — past closures list removed; past dates remain on calendar only |
 | §0b — mobile needs `capitalizeWords` | ⚠️ Still true in behaviour — `AddInfoScreen` **imports** `capitalizeWords` / `normalizeLocKey` but **does not call them** anywhere in `mobile/` yet |
 | §0 items 1–7 “done on mobile” | ✅ Still accurate for delete closures, mass cleaning, button copy, etc. |
 
@@ -194,8 +234,13 @@ Overall: **you can use mobile for basics** (lists, expiry banner, closure create
 **`mobile/src/screens/FoodListsScreen.tsx`**
 
 - [x] Home sort (W3 + §0d #14)
-- [ ] W1 / W2 / saved locations
+- [x] W1 / W2 / saved locations (June 4, 2026)
+- [x] Home/Out colours, Quick Add collapsed default, item edit Home vs Out, no list back arrows (June 4, 2026)
 - [ ] Eaten/thrown **stats** section like web list (optional)
+
+**`mobile/App.tsx` + Add Info hub headers**
+
+- [x] `SafeAreaProvider` + Add Info landing without back arrow; hub titles below notch (June 4, 2026)
 
 **Other**
 
@@ -206,12 +251,11 @@ Overall: **you can use mobile for basics** (lists, expiry banner, closure create
 
 ### Suggested order for the *next* mobile-only session
 
-1. **Food List Out parity (W1, W2)** — biggest daily-use gap vs web  
-2. **Add Info — calendar “batch 1”** from §0c: multi-select, drop Past closures list, selected-dates banner, time-off past dates allowed  
-3. **Add Info — calendar “batch 2”** from §0c/0d: grouping, range input, combo colors, home-style toasts  
-4. **Home closure banner (§0d #8–11)**  
-5. **Decide (§2.3)** — dedicated session  
-6. **Polish:** location dialog suggestions (W6), Food Wasted, native expiry push (W5)
+1. **Add Info — calendar “batch 1”** from §0c: multi-select, selected-dates banner, time-off past dates allowed  
+2. **Add Info — calendar “batch 2”** from §0c/0d: time-off grouping/range input, dark blue logic, save filters  
+3. **Home closure banner (§0d #8–11)** — blue/amber, until date, dedup  
+4. **Decide (§2.3)** — dedicated session (largest)  
+5. **Polish:** location dialog suggestions (W6), Food Wasted, native expiry push (W5), list archive stats
 
 ---
 
@@ -502,7 +546,7 @@ if (isDateSaved(date, type)) return; // ❌ WRONG - prevents selecting saved dat
 - [ ] **Fix 8:** Selected dates banner - Add banner showing "X days — dates" after calendar
 - [ ] **Fix 9:** Time off date range grouping - buildTimeOffGroups, list by group with date range, delete group
 - [ ] **Fix 10:** Time off same date multiple times - selected=user only, no disabled, allow re-select after save
-- [ ] **Fix 11:** Combo color - when date has both cleaning and time off, show blue-to-amber gradient (not default to one color)
+- [x] **Fix 11:** Combo color — half blue / half amber when both types on same day (June 4, 2026)
 
 **Reference Files:**
 - Web calendar logic: `client/src/pages/add-details.tsx` (Cleaning calendar, Time Off calendar, DayButton combo style)

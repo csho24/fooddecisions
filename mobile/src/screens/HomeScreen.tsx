@@ -162,18 +162,18 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         {/* Bottom row - Food List & Add Info */}
         <View style={styles.bottomRow}>
           <TouchableOpacity
-            style={styles.smallCard}
+            style={[styles.smallCard, styles.foodListCard]}
             onPress={() => navigation.navigate('FoodLists')}
             activeOpacity={0.9}
           >
-            <View style={styles.smallIconBg}>
-              <Ionicons name="list" size={20} color="#374151" />
+            <View style={[styles.smallIconBg, styles.foodListIconBg]}>
+              <Ionicons name="list" size={20} color="#1F4A38" />
             </View>
-            <Text style={styles.smallCardTitle}>Food List</Text>
-            <Ionicons 
-              name="list" 
-              size={80} 
-              color="rgba(0,0,0,0.05)" 
+            <Text style={[styles.smallCardTitle, styles.foodListCardTitle]}>Food List</Text>
+            <Ionicons
+              name="list"
+              size={80}
+              color="rgba(31, 74, 56, 0.12)"
               style={styles.smallCardBg}
             />
           </TouchableOpacity>
@@ -308,6 +308,16 @@ const styles = StyleSheet.create({
     padding: 20,
     overflow: 'hidden',
   },
+  /** Match web home: bg-secondary (soft sage green) */
+  foodListCard: {
+    backgroundColor: '#E2EDE8',
+  },
+  foodListIconBg: {
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  foodListCardTitle: {
+    color: '#1F4A38',
+  },
   addInfoCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
@@ -344,35 +354,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FDE68A',
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    width: '100%',
+    gap: 10,
   },
   closureBannerIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    marginTop: 2,
   },
   closureBannerContent: {
     flex: 1,
     minWidth: 0,
-    alignSelf: 'stretch',
   },
   closureBannerTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#92400E',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   closureBannerText: {
     fontSize: 14,
     color: '#B45309',
+    marginBottom: 4,
   },
   closureBannerType: {
     fontSize: 12,

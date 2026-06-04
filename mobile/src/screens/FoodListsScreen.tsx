@@ -186,11 +186,27 @@ export default function FoodListsScreen({ navigation, route }: FoodListsScreenPr
       }, {} as Record<string, typeof sortedItems>)
     : {};
 
+  const renderItemTypeIcon = (type: FoodType) => (
+    <View
+      style={[
+        styles.itemTypeIcon,
+        type === 'home' ? styles.itemTypeIconHome : styles.itemTypeIconOut,
+      ]}
+    >
+      <Ionicons
+        name={type === 'home' ? 'home' : 'restaurant'}
+        size={20}
+        color={type === 'home' ? '#EA580C' : '#059669'}
+      />
+    </View>
+  );
+
   const renderHomeItem = (item: FoodItem) => {
     const daysRemaining = getDaysRemaining(item.expiryDate);
 
     return (
       <View key={item.id} style={styles.itemRow}>
+        {renderItemTypeIcon('home')}
         <TouchableOpacity
           style={styles.itemContent}
           onPress={() => navigation.navigate('AddInfo', { itemId: item.id })}
@@ -242,7 +258,7 @@ export default function FoodListsScreen({ navigation, route }: FoodListsScreenPr
             setArchiveModalVisible(true);
           }}
         >
-          <Ionicons name="checkmark" size={24} color="#FFFFFF" />
+          <Ionicons name="checkmark" size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     );
@@ -369,11 +385,7 @@ export default function FoodListsScreen({ navigation, route }: FoodListsScreenPr
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
         <Text style={styles.title}>My Food Lists</Text>
-        <View style={{ width: 24 }} />
       </View>
 
       <View style={styles.tabs}>
@@ -410,6 +422,7 @@ export default function FoodListsScreen({ navigation, route }: FoodListsScreenPr
           data={activeTab === 'home' ? [] : sortedItems}
           keyExtractor={(item) => item.id}
           style={styles.list}
+          contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             activeTab === 'home' ? (
@@ -433,20 +446,26 @@ export default function FoodListsScreen({ navigation, route }: FoodListsScreenPr
             ) : null
           }
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.itemRow}
-              onPress={() => navigation.navigate('AddInfo', { itemId: item.id })}
-            >
-              <View style={styles.itemContent}>
+            <View style={styles.itemRow}>
+              {renderItemTypeIcon('out')}
+              <TouchableOpacity
+                style={styles.itemContent}
+                onPress={() => navigation.navigate('AddInfo', { itemId: item.id })}
+              >
                 <Text style={styles.itemText}>{item.name}</Text>
                 {item.locations && item.locations.length > 0 && (
                   <Text style={styles.locationMeta}>
                     {item.locations.map((l) => l.name).join(', ')}
                   </Text>
                 )}
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-            </TouchableOpacity>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AddInfo', { itemId: item.id })}
+                style={styles.chevronButton}
+              >
+                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
           )}
           ListEmptyComponent={
             activeTab === 'out' ? (
@@ -494,27 +513,31 @@ export default function FoodListsScreen({ navigation, route }: FoodListsScreenPr
   );
 }
 
+const SCREEN_PADDING = 20;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    justifyContent: 'center',
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   title: {
     fontSize: 20,
     fontWeight: '700',
     color: '#111827',
+    textAlign: 'center',
   },
   tabs: {
     flexDirection: 'row',
-    marginHorizontal: 16,
-    backgroundColor: '#E5E7EB',
+    marginHorizontal: SCREEN_PADDING,
+    marginBottom: 8,
+    backgroundColor: 'rgba(245, 242, 239, 0.85)',
     borderRadius: 12,
     padding: 4,
   },
@@ -528,7 +551,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   activeTab: {
-    backgroundColor: '#111827',
+    backgroundColor: '#F97316',
   },
   tabText: {
     fontSize: 14,
@@ -542,9 +565,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   quickAddWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   quickAddCard: {
     backgroundColor: '#FFFFFF',
@@ -567,7 +590,7 @@ const styles = StyleSheet.create({
   },
   quickAddBody: {
     padding: 16,
-    gap: 12,
+    gap: 16,
   },
   quickAddHeader: {
     flexDirection: 'row',
@@ -605,7 +628,8 @@ const styles = StyleSheet.create({
   },
   categorySelector: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
+    marginTop: 4,
   },
   categoryChip: {
     paddingHorizontal: 16,
@@ -614,7 +638,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
   },
   activeCategoryChip: {
-    backgroundColor: '#111827',
+    backgroundColor: '#F97316',
   },
   categoryChipText: {
     fontSize: 14,
@@ -628,7 +652,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -664,7 +688,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   submitButton: {
-    backgroundColor: '#111827',
+    backgroundColor: '#F97316',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -676,16 +700,21 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: SCREEN_PADDING,
+  },
+  listContent: {
+    paddingTop: 8,
+    paddingBottom: 32,
   },
   categorySection: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   categoryTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
-    marginBottom: 8,
+    marginBottom: 12,
+    marginTop: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -694,16 +723,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    paddingLeft: 16,
-    paddingRight: 8,
-    paddingVertical: 8,
-    marginBottom: 8,
+    paddingLeft: 12,
+    paddingRight: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+    minHeight: 80,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    gap: 12,
+  },
+  itemTypeIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  itemTypeIconHome: {
+    backgroundColor: '#FFEDD5',
+  },
+  itemTypeIconOut: {
+    backgroundColor: '#D1FAE5',
   },
   itemContent: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 4,
+    minWidth: 0,
+  },
+  chevronButton: {
+    padding: 8,
+    flexShrink: 0,
   },
   itemText: {
     fontSize: 16,
@@ -723,13 +773,14 @@ const styles = StyleSheet.create({
   },
   categoryTag: {
     fontSize: 10,
-    fontWeight: '500',
-    color: '#6B7280',
-    backgroundColor: '#F3F4F6',
+    fontWeight: '600',
+    color: '#1F4A38',
+    backgroundColor: '#E2EDE8',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   expiryBadge: {
     paddingHorizontal: 6,
@@ -749,14 +800,16 @@ const styles = StyleSheet.create({
   soonText: { color: '#CA8A04' },
   okText: { color: '#16A34A' },
   checkButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     backgroundColor: '#22C55E',
-    borderRadius: 24,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#16A34A',
+    flexShrink: 0,
+    marginLeft: 4,
   },
   emptyState: {
     paddingVertical: 32,

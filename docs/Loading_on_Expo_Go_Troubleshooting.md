@@ -14,9 +14,60 @@ npm install
 npx expo start --clear
 ```
 
-Reload Expo Go (shake device → Reload, or scan QR again).
+Reload Expo Go (see **Refreshing without scanning QR** below).
 
 **If 500 persists:** In the terminal where `expo start` runs, scroll to the first red `Error:` line (not only the 500 summary on the phone). That message is the real cause.
+
+---
+
+## June 4, 2026 — Refreshing without scanning QR
+
+You do **not** need to quit Expo Go or scan the QR code every time code changes. Keep **one** terminal running the dev server; reload the **JavaScript bundle** on the phone.
+
+### Everyday reload (after code edits)
+
+1. Leave this running (same terminal window is fine):
+   ```bash
+   cd mobile
+   npx expo start
+   ```
+2. On the phone, in Expo Go with Food Compass already open:
+   - **iPhone:** shake the device → **Reload**
+   - **Android:** shake or press hardware menu → **Reload**
+3. Or on the **Mac terminal** where Expo is running, press **`r`** — that tells the connected app to reload.
+
+### Reconnect without QR
+
+If you closed the app but the dev server is still running:
+
+1. Open **Expo Go**
+2. Go to **Projects** (or **Recently opened**)
+3. Tap **Food Compass** (or the LAN URL shown in the terminal)
+
+That reuses the last connection; no QR scan unless the server IP/port changed or you started a **new** `expo start` session.
+
+### When to use `--clear` (cache reset)
+
+Use only when something looks **stuck** on an old build (e.g. calendar colours wrong after a fix, red screen after `metro.config.js` change):
+
+```bash
+cd mobile
+npx expo start --clear
+```
+
+Then **Reload** once (shake → Reload or **`r`**). Still no need to scan QR if the project is in Recents.
+
+### Full restart (rare)
+
+Only if reload + `--clear` did not help:
+
+1. Stop the terminal server (Ctrl+C)
+2. `npx expo start --clear`
+3. Force-quit Expo Go, reopen, tap the project from **Recents**
+
+### Sanity check after reload
+
+On **Add Info → Cleaning** or **Time Off**, you should see a small legend: **Cleaning** (blue), **Time off** (amber), **Both** (half blue / half amber). Saved time-off days are amber on **both** tabs; cleaning days are blue. If the legend is missing, the phone is still on an old bundle — run `--clear` and reload again.
 
 ---
 

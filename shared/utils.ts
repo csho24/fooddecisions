@@ -20,3 +20,14 @@ export function capitalizeWords(str: string): string {
 export function normalizeLocKey(str: string): string {
   return str.trim().toLowerCase();
 }
+
+/** Normalize API/DB closure type strings for comparisons and styling. */
+export function normalizeClosureType(
+  type: string | undefined | null
+): 'cleaning' | 'timeoff' {
+  const t = String(type ?? '').toLowerCase().trim();
+  if (t === 'timeoff' || t === 'time_off' || t === 'time-off' || t === 'time off') {
+    return 'timeoff';
+  }
+  return 'cleaning';
+}
