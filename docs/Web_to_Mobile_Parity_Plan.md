@@ -2,7 +2,7 @@
 
 **Purpose:** Bring the mobile app in line with recent web changes. Web is the primary test surface; changes should be transferred to mobile so both behave the same.
 
-**Last updated:** June 4, 2026 (parity audit added in §0e; web code not changed for this audit)
+**Last updated:** June 4, 2026 (§Foundational rules; W1 Food List Quick Add done on mobile)
 
 **Note:** Some business logic functions are now shared in `shared/` folder:
 - ✅ `shared/utils.ts` - capitalizeWords, normalizeLocKey
@@ -11,9 +11,83 @@
 - ✅ `shared/home-list-sort.ts` - home Food List order (leftovers first, then soonest expiry)
 Both web and mobile **can** import from these shared files; not every screen uses every module yet (see §0e).
 
-**Start here for next mobile session:** §0e (June 2026 audit) — what’s done, what’s stale in older sections, and backlog not yet in §0/0c/0d.
+**Start here for next mobile session:** §0e (June 2026 audit) — then **§Foundational rules** below — then **one** backlog item (e.g. W1–W6 in §0e).
 
 **Verification:** Plan items are checked against **current web code** (client/src) so we don’t ask mobile to “fix” something web doesn’t do or overwrite with old doc behavior. Where web and mobile already match, the plan says “Parity: matched” and no change is requested.
+
+---
+
+## Foundational rules (read first — every mobile parity task)
+
+**Audience:** You (human) and **any AI** implementing mobile catch-up. Follow these before editing code.
+
+### 1. Source of truth
+
+| Layer | Source of truth | Rule |
+|--------|-----------------|------|
+| **Behaviour / function** | **Web app** (`client/src/`) | Web is what the user edits and ships daily. Mobile must **match what web does now**, not what an old doc row says. |
+| **Data** | **API + DB** | Both apps use the same backend. No mobile-only API shapes unless the user asks. |
+| **Shared rules** | **`shared/`** | If a rule must not diverge (sort order, expiry window, location display, categories), put it in `shared/` and import from both apps. **Do not** copy-paste the same formula into web and mobile separately. |
+
+### 2. Hard constraints (do not break these)
+
+1. **Do not change the web app** when doing mobile parity **unless the user explicitly asks**. Read web files; edit only `mobile/` (and `shared/` when appropriate).
+2. **Do not delete** existing mobile or web features, routes, or doc sections **without asking** the user first.
+3. **One functional slice per session** — e.g. “Food List Out + locations”, not “sync everything”. Reduces breakage and makes testing possible.
+4. **Do not assume parity from this document** — older sections (§0, §0c, §0d) can be stale. **Open the web file** and **grep mobile** before claiming done.
+5. **Function first, aesthetics second** — match flows, validation, and data; RN layout may differ. Hover → long-press or omit; browser notifications → optional native later.
+
+### 3. How to implement one slice (workflow for AI)
+
+1. **Name the slice** (e.g. W1 in §0e) and the **web reference file(s)** (e.g. `client/src/pages/list.tsx`, `client/src/hooks/use-saved-locations.ts`).
+2. **Read web end-to-end** for that slice: state variables, validation, API calls, edge cases (blur, multi-select, save filters).
+3. **Check mobile** for what already exists; reuse `shared/` if present.
+4. **Implement in `mobile/src/` only** (add `mobile/src/hooks/` etc. as needed). Mirror **behaviour**, not line-by-line JSX.
+5. **RN input / suggestions:** When copying web location autocomplete, taps must **set state on press** and **not** rely on `blur()` before the value commits (see `docs/Problems and Fixes.md` May 3, 2026). Use `Pressable`/`TouchableOpacity` `onPress` to apply pick; optional `onPressIn` to keep keyboard; delay hiding suggestions ~200ms on `TextInput` `onBlur` if needed.
+6. **Test on Expo Go** (or simulator) for that slice only; do not refactor unrelated screens.
+7. **Update §0e** (and the slice row): mark ✅ with date or note “done”; do not remove historical §0c detail.
+
+### 4. What “identical” means (so expectations are clear)
+
+- **Identical:** Same user can achieve the same outcome (add Out item with required location + suggestions; mark cleaning for date range; see Expiring Soon on home; etc.).
+- **Acceptable differences:** OS install, safe areas, no mouse hover tooltips, optional push vs browser notifications, scroll/gesture feel.
+- **Not acceptable:** Mobile silently omits a required field, blocks an action web allows, or uses different save rules without user approval.
+
+### 5. Priority order when choosing the next slice
+
+Use §0e **Suggested order**. Default high-impact slices:
+
+1. **W1** — Food List Out: Quick Add + location required + saved-location suggestions  
+2. **Add Info calendar batch** — §0c Fixes 1–8 (multi-date, list grouping, etc.)  
+3. **Home closure banner** — §0d #8–11  
+4. **Decide** — §2.3 (largest; own session)
+
+### 6. Shared modules (use before duplicating logic)
+
+| Module | Purpose |
+|--------|---------|
+| `shared/utils.ts` | `capitalizeWords`, `normalizeLocKey` |
+| `shared/business-logic.ts` | `categorizeFood`, `getClosureDisplayLocation` |
+| `shared/expiry-reminders.ts` | Home “Expiring Soon” list |
+| `shared/home-list-sort.ts` | Home Food List sort (leftover → expiry → name) |
+
+Mobile-only storage (e.g. saved locations history): `mobile/src/hooks/use-saved-locations.ts` — mirror web hook API; use AsyncStorage instead of `localStorage`. **Same** `STORAGE_KEY` string as web (`food-compass-saved-locations`) so behaviour stays aligned if both ever share a device WebView (optional).
+
+### 7. Key web → mobile file map (quick reference)
+
+| Feature | Web (read this) | Mobile (edit this) |
+|---------|-----------------|-------------------|
+| Food List / Quick Add | `client/src/pages/list.tsx` | `mobile/src/screens/FoodListsScreen.tsx` |
+| Saved locations hook | `client/src/hooks/use-saved-locations.ts` | `mobile/src/hooks/use-saved-locations.ts` |
+| Home banners | `client/src/pages/home.tsx` | `mobile/src/screens/HomeScreen.tsx` |
+| Closures / calendar | `client/src/pages/add-details.tsx` | `mobile/src/screens/AddInfoScreen.tsx` |
+| Decide | `client/src/pages/decide.tsx` | `mobile/src/screens/DecideScreen.tsx` |
+
+### 8. When stuck
+
+- Re-read the **web handler** for the button/save path — do not invent mobile-only rules.  
+- If web and doc disagree, **web wins**. Update the doc after confirming in code.  
+- If the slice is too big, split (e.g. “Out location required” first, then “suggestions”) and document what’s left in §0e.
 
 ---
 
@@ -88,8 +162,8 @@ Overall: **you can use mobile for basics** (lists, expiry banner, closure create
 
 | ID | What web has now | Mobile today | Next mobile action |
 |----|------------------|--------------|-------------------|
-| **W1** | **Food List Quick Add** — expand panel; Home/Out; Out **requires location**; `useSavedLocations` autocomplete from store + history | `FoodListsScreen`: single `TextInput`, no Out location | Port quick-add UX; AsyncStorage hook mirroring `client/src/hooks/use-saved-locations.ts`; location required for Out |
-| **W2** | **Location suggestion tap** (May 2026) — `onPointerDown` / `onTouchEnd`, **no `blur()` after pick** (`list.tsx`, `add-details` location dialog) | No suggestion UI | When adding W1/F1, use same pick pattern (RN: avoid blur-before-setValue race on `TextInput`) |
+| **W1** | **Food List Quick Add** — expand panel; Home/Out; Out **requires location**; `useSavedLocations` autocomplete from store + history | ✅ **Done June 4, 2026** — `FoodListsScreen.tsx` + `mobile/src/hooks/use-saved-locations.ts` | None for list quick add |
+| **W2** | **Location suggestion tap** — apply on press; no blur-before-setValue | ✅ **Done with W1** — `Pressable` + `applyLocationPick` (see §Foundational rules) | Reuse in **W6** Add Location dialog |
 | **W3** | **Home list: leftovers pinned to top** then expiry order | ✅ `shared/home-list-sort.ts` | **None** — keep shared module in sync if sort rules change |
 | **W4** | **Home: “Expiring Soon”** banner (12-day window) | ✅ `shared/expiry-reminders.ts` on `HomeScreen` | **None** for in-app banner |
 | **W5** | **Browser expiry alerts** (opt-in, once/day on home load) | N/A | Optional: `expo-notifications` if you want push without opening app |
@@ -610,8 +684,8 @@ Reference: `client/src/pages/decide.tsx` (structure, `groupedItems`, `itemsByFoo
 | Home / Out tabs | ✅ | ✅ | — |
 | Add item | ✅ | ✅ | — |
 | Archive (eaten/thrown) | ✅ | ✅ | — |
-| Quick add with location (Out) | ✅ | ❌ | **Gap (W1):** Web has collapsible Quick Add; mobile only has plain name field. |
-| Saved locations / autocomplete | ✅ useSavedLocations | ❌ | **Gap (W1/W2):** No mobile hook; no suggestions. |
+| Quick add with location (Out) | ✅ | ✅ | **Done June 4, 2026** (W1). |
+| Saved locations / autocomplete | ✅ useSavedLocations | ✅ | `mobile/src/hooks/use-saved-locations.ts` (W1/W2). |
 | Home list sort (leftover → expiry → name) | ✅ `compareHomeFoodListItems` | ✅ Same shared module | **Done (June 2026).** See §0e W3. |
 | Home “Expiring Soon” on Food List home tab | N/A (banner on **Home** page) | N/A | Expiry **banner** is on Home screen (W4), not List tab. |
 | Archive stats (eaten, thrown) | ✅ | ❓ | **Check:** Web has stats; ensure mobile shows equivalent if desired. |
