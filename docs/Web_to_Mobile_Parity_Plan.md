@@ -57,7 +57,7 @@ Both web and mobile **can** import from these shared files; not every screen use
 
 Use §0e **Suggested order**. Default high-impact slices:
 
-1. **W1** — Food List Out: Quick Add + location required + saved-location suggestions  
+1. ~~**W1**~~ — Food List Out: Quick Add + location required + saved-location suggestions ✅ June 4, 2026  
 2. **Add Info calendar batch** — §0c Fixes 1–8 (multi-date, list grouping, etc.)  
 3. **Home closure banner** — §0d #8–11  
 4. **Decide** — §2.3 (largest; own session)
@@ -72,6 +72,8 @@ Use §0e **Suggested order**. Default high-impact slices:
 | `shared/home-list-sort.ts` | Home Food List sort (leftover → expiry → name) |
 
 Mobile-only storage (e.g. saved locations history): `mobile/src/hooks/use-saved-locations.ts` — mirror web hook API; use AsyncStorage instead of `localStorage`. **Same** `STORAGE_KEY` string as web (`food-compass-saved-locations`) so behaviour stays aligned if both ever share a device WebView (optional).
+
+**Expo / Metro:** Imports from `shared/` require `mobile/metro.config.js` (`watchFolders` → repo root). Without it, Expo Go shows **500** / “Unable to resolve module ../../../shared/…”. See `docs/Loading_on_Expo_Go_Troubleshooting.md` (June 4, 2026).
 
 ### 7. Key web → mobile file map (quick reference)
 

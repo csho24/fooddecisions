@@ -1,6 +1,26 @@
-# Loading on Expo Go - Troubleshooting Log - December 6, 2024
+# Loading on Expo Go - Troubleshooting Log
 
-## Initial Condition
+## June 4, 2026 — Red screen: “Development server returned response error code: 500”
+
+**Symptom:** Expo Go shows red error text; Metro returns HTTP 500 when loading the bundle.
+
+**Common cause (this repo):** Mobile screens import from repo-root `shared/` (e.g. `../../../shared/expiry-reminders`). By default Metro only looks inside `mobile/`, so bundling fails with `Unable to resolve module ../../../shared/...`.
+
+**Fix:** `mobile/metro.config.js` sets `watchFolders` to the repo root and `resolver.nodeModulesPaths` so `shared/` resolves. After adding or changing that file:
+
+```bash
+cd mobile
+npm install
+npx expo start --clear
+```
+
+Reload Expo Go (shake device → Reload, or scan QR again).
+
+**If 500 persists:** In the terminal where `expo start` runs, scroll to the first red `Error:` line (not only the 500 summary on the phone). That message is the real cause.
+
+---
+
+## December 6, 2024 — Initial Condition
 **Date:** December 6, 2024 (Dec 6)  
 **Issue:** Expo mobile app showing only splash screen, unable to preview on phone  
 **Context:** This was approximately the 16th attempt (10 previous attempts with Replit, 6 with current troubleshooting session)
