@@ -2,12 +2,16 @@
 
 **Purpose:** Bring the mobile app in line with recent web changes. Web is the primary test surface; changes should be transferred to mobile so both behave the same.
 
-**Last updated:** Mar 6, 2026
+**Last updated:** June 4, 2026 (parity audit added in §0e; web code not changed for this audit)
 
 **Note:** Some business logic functions are now shared in `shared/` folder:
 - ✅ `shared/utils.ts` - capitalizeWords, normalizeLocKey
 - ✅ `shared/business-logic.ts` - categorizeFood, getClosureDisplayLocation
-Both web and mobile import from these shared files, reducing duplication.
+- ✅ `shared/expiry-reminders.ts` - home “Expiring Soon” list (12-day window; bread excluded in logic only)
+- ✅ `shared/home-list-sort.ts` - home Food List order (leftovers first, then soonest expiry)
+Both web and mobile **can** import from these shared files; not every screen uses every module yet (see §0e).
+
+**Start here for next mobile session:** §0e (June 2026 audit) — what’s done, what’s stale in older sections, and backlog not yet in §0/0c/0d.
 
 **Verification:** Plan items are checked against **current web code** (client/src) so we don’t ask mobile to “fix” something web doesn’t do or overwrite with old doc behavior. Where web and mobile already match, the plan says “Parity: matched” and no change is requested.
 
@@ -44,6 +48,107 @@ Everything we changed on web in this chat is listed below with **Applied to mobi
 | 23 | **Decide: show “closed today” while browsing:** Decide lists should visually mark stalls closed today due to cleaning/time off (light red tint + “Closed today …”), and weekly closedDays should actually affect availability without requiring a click | ❌ No | Fetch closures for today in mobile Decide; compute availability per location context; tint closed-by-schedule rows and show badge. Reference: `client/src/pages/decide.tsx`. |
 
 **Summary:** Items 1–3, 5–7 are done on mobile. Item 4 (tooltip) and 9 (input alignment) are optional/low. Item 8 – **Home closure banner colors** still needs to be done on mobile. Item 10 – **Decide** (tabs + drill + hide back) is the big parity piece not yet on mobile. **Items 11–20** are calendar/time-off fixes that need to be replicated on mobile (section 0c + items 18–20).
+
+**⚠️ Stale as of June 2026:** §0d item 14 says mobile has no home expiry sort — mobile **now uses** `shared/home-list-sort.ts`. See §0e for current truth.
+
+---
+
+## 0e. June 4, 2026 — Parity audit (web vs mobile vs this doc)
+
+**Method:** Read-only check of `client/src` (web, your daily driver), `mobile/src` (Expo app), and `shared/`. **No web changes** for this audit.
+
+### How far off are we? (rough)
+
+| Area | Web (today) | Mobile (today) | Gap |
+|------|-------------|----------------|-----|
+| **Home – Expiring Soon** | Banner + optional browser “Enable alerts” | In-app banner only (shared logic) | Small (native push optional later) |
+| **Home – Closed Today** | Blue cleaning / amber time off; time off “until …”; dedup vs weekly closed | All amber; simpler lines; no “until” / dedup | Medium |
+| **Food List – Home** | Quick Add; leftover-first + expiry sort; archive stats | Name-only add; **same sort** via shared module; archive modal ✅ | Medium (Quick Add missing) |
+| **Food List – Out** | Quick Add + **location required** + saved-location suggestions | Name-only add; **no location** on add | **Large** |
+| **Add Info / closures** | Full calendar/time-off UX (grouped lists, range input, combo colors, no “Past closures” list UI) | Older calendar; **Past closures** section still present; many 0c/0d items open | **Large** |
+| **Decide** | Location/Food tabs, drill-down, closed-today styling | Flat SectionList by location only | **Largest** |
+| **Food Wasted** | Dedicated page | No screen | Optional |
+
+Overall: **you can use mobile for basics** (lists, expiry banner, closure create/delete, simple Decide). **Daily parity with how you use the web** still needs Food List Out + location history, then Add Info calendar/time-off batch, then Decide.
+
+---
+
+### Corrections to older sections of *this* document
+
+| Older doc claim | Actual code (June 2026) |
+|-----------------|-------------------------|
+| §0d #14 — mobile Home list has no expiry-first sort | ❌ Stale — `FoodListsScreen.tsx` sorts with `compareHomeFoodListItems` (`shared/home-list-sort.ts`): **leftovers first**, then soonest expiry, then name |
+| §2.5 — “Upcoming vs past closures ✅ Same” on mobile | ⚠️ Misleading — mobile still renders a **“Past closures”** list block (`AddInfoScreen.tsx` ~920+). Web has **no** “Past closures” heading in UI (past dates stay on the calendar only) |
+| §0b — mobile needs `capitalizeWords` | ⚠️ Still true in behaviour — `AddInfoScreen` **imports** `capitalizeWords` / `normalizeLocKey` but **does not call them** anywhere in `mobile/` yet |
+| §0 items 1–7 “done on mobile” | ✅ Still accurate for delete closures, mass cleaning, button copy, etc. |
+
+---
+
+### Web changes **not** listed in §0 / §0c / §0d yet (add to next mobile work)
+
+| ID | What web has now | Mobile today | Next mobile action |
+|----|------------------|--------------|-------------------|
+| **W1** | **Food List Quick Add** — expand panel; Home/Out; Out **requires location**; `useSavedLocations` autocomplete from store + history | `FoodListsScreen`: single `TextInput`, no Out location | Port quick-add UX; AsyncStorage hook mirroring `client/src/hooks/use-saved-locations.ts`; location required for Out |
+| **W2** | **Location suggestion tap** (May 2026) — `onPointerDown` / `onTouchEnd`, **no `blur()` after pick** (`list.tsx`, `add-details` location dialog) | No suggestion UI | When adding W1/F1, use same pick pattern (RN: avoid blur-before-setValue race on `TextInput`) |
+| **W3** | **Home list: leftovers pinned to top** then expiry order | ✅ `shared/home-list-sort.ts` | **None** — keep shared module in sync if sort rules change |
+| **W4** | **Home: “Expiring Soon”** banner (12-day window) | ✅ `shared/expiry-reminders.ts` on `HomeScreen` | **None** for in-app banner |
+| **W5** | **Browser expiry alerts** (opt-in, once/day on home load) | N/A | Optional: `expo-notifications` if you want push without opening app |
+| **W6** | **Add Location dialog** — location name suggestions (same tap rules as W2) | Location modal = plain `TextInput` only | Add suggestions + pick handling when editing item locations |
+
+---
+
+### Still open from §0 / §0c / §0d (code-verified)
+
+**`mobile/src/screens/AddInfoScreen.tsx`** (closure / time off) — doc steps still apply; confirmed in code:
+
+- [ ] **Multi-date:** `if (isDateSaved(date, type)) return` still blocks re-select (~155)
+- [ ] **Remove “Past closures” list section** (~920+) to match web
+- [ ] **Time off:** past dates still disabled via `isPast` pattern (~848–886 area)
+- [ ] **Selected dates banner**, **time-off range text**, **buildTimeOffGroups** / grouped scheduled list, **combo day colors**, **dark blue = 2+ locations**, duplicate-date filter on save, cross-month range labels, etc. — see §0c checklist (unchanged)
+
+**`mobile/src/screens/HomeScreen.tsx`**
+
+- [ ] Closure line colors by type (§0 #8, §0d #9–11)
+- [x] Expiring Soon (W4)
+
+**`mobile/src/screens/DecideScreen.tsx`**
+
+- [ ] Full §2.3 parity: `outTab`, location drill, food category drill, hide header back when drilled, **closed today** tint/badge (§0 #23, `decide.tsx`)
+
+**`mobile/src/screens/FoodListsScreen.tsx`**
+
+- [x] Home sort (W3 + §0d #14)
+- [ ] W1 / W2 / saved locations
+- [ ] Eaten/thrown **stats** section like web list (optional)
+
+**Other**
+
+- [ ] **Food Wasted** screen (§2.5) — web only
+- [ ] **capitalizeWords** actually used on blur/save (not just imported)
+
+---
+
+### Suggested order for the *next* mobile-only session
+
+1. **Food List Out parity (W1, W2)** — biggest daily-use gap vs web  
+2. **Add Info — calendar “batch 1”** from §0c: multi-select, drop Past closures list, selected-dates banner, time-off past dates allowed  
+3. **Add Info — calendar “batch 2”** from §0c/0d: grouping, range input, combo colors, home-style toasts  
+4. **Home closure banner (§0d #8–11)**  
+5. **Decide (§2.3)** — dedicated session  
+6. **Polish:** location dialog suggestions (W6), Food Wasted, native expiry push (W5)
+
+---
+
+### Files to touch (mobile only, when you implement)
+
+| File | Typical work |
+|------|----------------|
+| `mobile/src/screens/FoodListsScreen.tsx` | W1, W2, stats optional |
+| `mobile/src/hooks/use-saved-locations.ts` (new) | Mirror web hook + AsyncStorage |
+| `mobile/src/screens/AddInfoScreen.tsx` | §0c/0d calendar + closures list |
+| `mobile/src/screens/HomeScreen.tsx` | Closure banner colours / until / dedup |
+| `mobile/src/screens/DecideScreen.tsx` | §2.3 |
+| `shared/*.ts` | Prefer extend shared logic; UI stays separate |
 
 ---
 
@@ -505,8 +610,10 @@ Reference: `client/src/pages/decide.tsx` (structure, `groupedItems`, `itemsByFoo
 | Home / Out tabs | ✅ | ✅ | — |
 | Add item | ✅ | ✅ | — |
 | Archive (eaten/thrown) | ✅ | ✅ | — |
-| Quick add with location (Out) | ✅ | ❓ | **Check:** Does mobile support location when adding Out item? |
-| Saved locations / autocomplete | ✅ useSavedLocations | ❓ | **Check:** Mobile has no `useSavedLocations`; add if list add-flow uses location input. |
+| Quick add with location (Out) | ✅ | ❌ | **Gap (W1):** Web has collapsible Quick Add; mobile only has plain name field. |
+| Saved locations / autocomplete | ✅ useSavedLocations | ❌ | **Gap (W1/W2):** No mobile hook; no suggestions. |
+| Home list sort (leftover → expiry → name) | ✅ `compareHomeFoodListItems` | ✅ Same shared module | **Done (June 2026).** See §0e W3. |
+| Home “Expiring Soon” on Food List home tab | N/A (banner on **Home** page) | N/A | Expiry **banner** is on Home screen (W4), not List tab. |
 | Archive stats (eaten, thrown) | ✅ | ❓ | **Check:** Web has stats; ensure mobile shows equivalent if desired. |
 | Checkmark visibility (list item layout) | ✅ Fixed per List_Page_Checkmark_Visibility_Fix | ❓ | **Check:** Ensure mobile list row doesn’t clip action/checkmark; add shrink-0 if needed. |
 | Deep link / filter from URL | ✅ | N/A (mobile uses route params) | — |

@@ -23,6 +23,12 @@
 
 ---
 
+## June 4, 2026 — Full parity audit
+
+See **`docs/Web_to_Mobile_Parity_Plan.md` §0e** for a read-only comparison of web vs Expo mobile vs what older plan sections still claim. New shared modules since Mar 2026: `shared/expiry-reminders.ts`, `shared/home-list-sort.ts`. **Do not change web** when doing mobile catch-up — port behaviour into `mobile/src` and extend `shared/` where possible.
+
+---
+
 ## Strategy 1: Share More Business Logic (RECOMMENDED)
 
 **What to Share:**
