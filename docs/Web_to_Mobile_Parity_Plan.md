@@ -8,7 +8,8 @@
 |------|------|
 | **Food List** | Quick Add (W1/W2): Home/Out, Out location required + saved-location suggestions; sage **Home** card colour; orange/emerald row icons; Quick Add **collapsed by default**; smaller green add buttons; **no header back arrows** on list + item edit (system/gesture back); Home edit = Fridge/Snacks only, Save Changes, no Delete, name→underline spacing; Out edit = locations + food categories, Delete, extra top padding for name |
 | **Home** | “Closed Today” banner layout (icon + text column); big home cards left as-is (user happy with tap size) |
-| **Add Info — closures** | Calendar legend above weekday row; combo day colour (half blue / half amber); grouped **Scheduled Closures** list via `shared/business-logic`; **removed “Past closures” list** (past dates stay on calendar) |
+| **Add Info — closures** | Calendar legend (Cleaning / Time off / **Both**); **dark blue** (2+ cleaning locations/day), **dark orange** (2+ time-off stalls/day), combo half-and-half; grouped **Scheduled Closures** list; **removed “Past closures” list** |
+| **Food List — location suggestions (W1/W2)** | **User-verified June 4:** Out Quick Add, type e.g. `GH` → Ghim Moh / Ghim Moh Link suggestions, tap fills field correctly |
 | **Add Info — hub UI** | **Add Info** landing: **no top back arrow** (use system back to Home); **titles moved below notch** — `SafeAreaProvider` in `App.tsx` + `useSafeAreaInsets` header padding on Add Info / Closure / Expiry (and cleaning/time-off calendar) |
 | **Add Info — cleaning location** | Web parity: “X stalls identified…”, orange **Mark all** button, **Select specific stalls** (scrollable list; Cancel/Save below list); location matching (`Clementi` → hawker name); skip already-saved cleaning dates |
 | **Mobile keyboard UX** | Cleaning/time-off: `KeyboardAvoidingView` + scroll focused field into view — **any screen with bottom `TextInput` must keep the field visible above the keyboard** (standard app expectation) |
@@ -17,12 +18,16 @@
 **Still open (function > design):**
 
 - **Decide** — Location/Food tabs, drill-down, closed-today styling (§2.3; **largest gap** — not started on mobile).
-- **Add Info calendar (time off + polish)** — multi-date select, time-off range text, grouped time-off list, selected-dates banner, past dates selectable on time off, dark blue = 2+ locations, orange rings on selected days, etc. (§0c / §0d). **Cleaning location + mass/single stall save ≈ web** (June 4); rest of calendar backlog remains.
+- **Add Info calendar (time off + behaviour)** — see §0e “Calendar backlog” below (multi-date UX, range text, selected-dates banner, time-off list grouping, orange selection rings, etc.). **Not** dark blue / dark orange / combo — those are **in the app** (you saw them); legend only shows normal blue, amber, and Both (not darker variants — optional polish).
 - **Home closure banner** — blue cleaning / amber time off; “time off until …”; dedup vs weekly closed (§0 #8, §0d #9–11).
-- **Add Location dialog (W6)** — location suggestions when editing Out item locations (same tap rules as Quick Add).
-- **Polish optional:** `capitalizeWords` on blur/save (imported but not always applied); Food Wasted screen; native expiry push (W5); archive stats on list; many buttons still default **black** on mobile (cosmetic).
+- **W6 — Add Location dialog only** — Food List Quick Add suggestions ✅ (you tested). **Out item → Add/Edit Location** modal is still a plain `TextInput` with **no** suggestions (`AddInfoScreen.tsx` location modal).
+- **Polish optional:** `capitalizeWords` on blur/save; Food Wasted screen; native expiry push (W5); archive stats; black buttons on some screens (cosmetic).
 
-**Honest status (June 4, 2026):** We have **not** done everything. Daily-use paths (home, food lists, quick add, expiry, basic closures, cleaning-by-location) are in good shape after today. **Decide**, **full calendar/time-off parity**, and **home banner colours/copy** are still real gaps vs web. Anything marked ✅ here or in §0e should still be **spot-checked on a real phone** (Expo Go) — bugs may exist that we have not hit yet; that is normal until you test each flow once.
+**Where the code lives (same GitHub repo):** Everything pushes to **`main`** on [fooddecisions](https://github.com/csho24/fooddecisions) — `client/` (web), `mobile/` (Expo app), `server/`, `shared/`, `docs/`. Mobile changes are **not** a separate repo; they are under `mobile/` in this project.
+
+**How to find gaps next time:** Use the app on your **phone** (Expo Go) for real tasks — that surfaces issues docs miss. You do **not** need to be at the computer for mobile testing (phone + same Wi‑Fi as Metro). Use the **web** at the computer when comparing behaviour side-by-side.
+
+**Honest status (June 4, 2026):** Core mobile paths are usable; **Decide** and **time-off calendar depth** are the main known gaps vs web. Dark blue / overlap / combo on the closure calendar are **implemented** (user-confirmed). Remaining risk is **untested edge cases** on flows we touched — normal until each flow gets a real-world pass.
 
 **Be careful next session:**
 
@@ -40,7 +45,7 @@
 
 **Purpose:** Bring the mobile app in line with recent web changes. Web is the primary test surface; changes should be transferred to mobile so both behave the same.
 
-**Last updated:** June 4, 2026 (session log; pushed end-of-day — Food List polish, Add Info hub/cleaning/keyboard; not full parity)
+**Last updated:** June 4, 2026 (doc corrected: calendar colours done; W1/W2 user-tested; W6 = Add Location modal only; repo note)
 
 **Note:** Some business logic functions are now shared in `shared/` folder:
 - ✅ `shared/utils.ts` - capitalizeWords, normalizeLocKey
@@ -209,18 +214,40 @@ Overall: **you can use mobile for basics** (lists, expiry banner, closure create
 | **W3** | **Home list: leftovers pinned to top** then expiry order | ✅ `shared/home-list-sort.ts` | **None** — keep shared module in sync if sort rules change |
 | **W4** | **Home: “Expiring Soon”** banner (12-day window) | ✅ `shared/expiry-reminders.ts` on `HomeScreen` | **None** for in-app banner |
 | **W5** | **Browser expiry alerts** (opt-in, once/day on home load) | N/A | Optional: `expo-notifications` if you want push without opening app |
-| **W6** | **Add Location dialog** — location name suggestions (same tap rules as W2) | Location modal = plain `TextInput` only | Add suggestions + pick handling when editing item locations |
+| **W6** | **Add Location dialog** — location name suggestions (same tap rules as W2) | ❌ Plain `TextInput` in item location modal | Port `useSavedLocations` + pick UI from `FoodListsScreen` Quick Add |
+
+---
+
+### Calendar — implemented vs backlog (June 4, 2026, code + user)
+
+| Item | Mobile | Notes |
+|------|--------|--------|
+| Combo (cleaning + time off same day) | ✅ | Legend: “Both” |
+| Dark blue (2+ cleaning **locations** same day) | ✅ | User saw on phone; **not** in legend (optional) |
+| Dark orange (2+ time-off entries same day) | ✅ | User saw on phone; **not** in legend (optional) |
+| Cleaning location UI (stall count, Mark all, Select specific stalls) | ✅ | June 4 |
+| Skip duplicate cleaning dates on save | ✅ | Cleaning save path |
+| Past closures list removed | ✅ | |
+| Multi-date re-select / orange rings / selected-dates banner | ❓ | `toggleDateSelection` no longer blocks saved dates — **verify** multi-day UX vs web |
+| Time-off range text, grouped time-off list rows, past dates on time off | ❌ | §0c / §0d |
+| Calendar day tooltip (long-press) | ❌ | Optional |
 
 ---
 
 ### Still open from §0 / §0c / §0d (code-verified)
 
-**`mobile/src/screens/AddInfoScreen.tsx`** (closure / time off) — doc steps still apply; confirmed in code:
+**`mobile/src/screens/AddInfoScreen.tsx`** (closure / time off):
 
-- [ ] **Multi-date:** `if (isDateSaved(date, type)) return` still blocks re-select (~155)
-- [x] **Remove “Past closures” list section** — done June 4, 2026 (past dates remain on calendar only)
-- [ ] **Time off:** past dates still disabled via `isPast` pattern (~848–886 area)
-- [ ] **Selected dates banner**, **time-off range text**, **buildTimeOffGroups** / grouped scheduled list, **combo day colors**, **dark blue = 2+ locations**, duplicate-date filter on save, cross-month range labels, etc. — see §0c checklist (unchanged)
+- [x] **Remove “Past closures” list** — June 4, 2026
+- [x] **Combo day colour** — June 4, 2026
+- [x] **Dark blue / dark orange** — in code (`getCleaningLocationCountForDate`, `getTimeOffEntryCountForDate`); user-confirmed on device
+- [x] **Cleaning save** — duplicate-date filter; stall UI (June 4)
+- [ ] **Selected dates banner** (“X days — …”)
+- [ ] **Time-off range text** (“7 Apr to 20 May”)
+- [ ] **Time-off list grouping** (consecutive date ranges per stall)
+- [ ] **Time off:** confirm past dates fully selectable (re-check vs web)
+- [ ] **Orange ring** on selected days (cleaning + time off tabs)
+- [ ] **Legend:** optional swatches for dark blue / dark orange
 
 **`mobile/src/screens/HomeScreen.tsx`**
 
@@ -251,11 +278,12 @@ Overall: **you can use mobile for basics** (lists, expiry banner, closure create
 
 ### Suggested order for the *next* mobile-only session
 
-1. **Add Info — calendar “batch 1”** from §0c: multi-select, selected-dates banner, time-off past dates allowed  
-2. **Add Info — calendar “batch 2”** from §0c/0d: time-off grouping/range input, dark blue logic, save filters  
-3. **Home closure banner (§0d #8–11)** — blue/amber, until date, dedup  
-4. **Decide (§2.3)** — dedicated session (largest)  
-5. **Polish:** location dialog suggestions (W6), Food Wasted, native expiry push (W5), list archive stats
+1. **Real-use testing on phone** — note anything broken (best way to find unknowns)  
+2. **W6** — Add Location modal suggestions (Quick Add pattern already works)  
+3. **Add Info — time off calendar batch** — selected-dates banner, range text, grouped list (§0c)  
+4. **Home closure banner (§0d #8–11)** — blue/amber, until date, dedup  
+5. **Decide (§2.3)** — dedicated session (largest)  
+6. **Polish:** legend dark variants, Food Wasted, push (W5), archive stats
 
 ---
 
@@ -547,6 +575,7 @@ if (isDateSaved(date, type)) return; // ❌ WRONG - prevents selecting saved dat
 - [ ] **Fix 9:** Time off date range grouping - buildTimeOffGroups, list by group with date range, delete group
 - [ ] **Fix 10:** Time off same date multiple times - selected=user only, no disabled, allow re-select after save
 - [x] **Fix 11:** Combo color — half blue / half amber when both types on same day (June 4, 2026)
+- [x] **Fix 3 (dark blue):** 2+ distinct cleaning locations per day — implemented mobile; user-confirmed June 4 (legend optional)
 
 **Reference Files:**
 - Web calendar logic: `client/src/pages/add-details.tsx` (Cleaning calendar, Time Off calendar, DayButton combo style)
