@@ -10,6 +10,15 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Input } from "@/components/ui/input";
 import { categorizeFood, FoodCategory } from "../../../shared/business-logic";
 import { getClosureSchedules, type ClosureSchedule } from "@/lib/api";
+import { getSingaporeTodayDateStr } from "../../../shared/singapore-time";
+
+function getDecideClosedLabel(reason?: string): string | null {
+  if (!reason) return null;
+  const lower = reason.toLowerCase();
+  if (lower.includes("closed today")) return reason;
+  if (lower === "closed now") return "Closed now";
+  return null;
+}
 
 export default function Decide() {
   const { items, checkAvailability } = useFoodStore();
@@ -26,11 +35,7 @@ export default function Decide() {
   useEffect(() => {
     getClosureSchedules()
       .then((closures) => {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, "0");
-        const day = String(today.getDate()).padStart(2, "0");
-        const todayStr = `${year}-${month}-${day}`;
+        const todayStr = getSingaporeTodayDateStr();
         setTodaysClosures(closures.filter((c) => c.date === todayStr));
       })
       .catch((err) => console.error("Failed to fetch closures for Decide:", err));
@@ -319,9 +324,9 @@ export default function Decide() {
                 )}>
                   {item.name}
                 </h4>
-                {!item.status.available && (
+                {!item.status.available && getDecideClosedLabel(item.status.reason) && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 bg-destructive/10 text-destructive rounded flex items-center gap-1 whitespace-nowrap">
-                    <Clock size={10} /> {item.status.reason || "Closed"}
+                    <Clock size={10} /> {getDecideClosedLabel(item.status.reason)}
                   </span>
                 )}
               </div>
@@ -479,9 +484,9 @@ export default function Decide() {
                                  )}>
                                    {item.name}
                                  </h4>
-                                 {!item.status.available && (
+                                 {!item.status.available && getDecideClosedLabel(item.status.reason) && (
                                    <span className="text-[10px] font-medium px-1.5 py-0.5 bg-destructive/10 text-destructive rounded flex items-center gap-1 whitespace-nowrap">
-                                     <Clock size={10} /> {item.status.reason || "Closed"}
+                                     <Clock size={10} /> {getDecideClosedLabel(item.status.reason)}
                                    </span>
                                  )}
                                </div>
@@ -613,10 +618,9 @@ export default function Decide() {
                               >
                                 <Utensils size={20} className="mr-3 text-primary" />
                                   <span className="text-lg font-medium">{item.name}</span>
-                                  {/* Only show a badge when it's actually closed-today (not opening-hours like \"Opens 10:00\") */}
-                                  {!item.status.available && (item.status.reason || "").toLowerCase().includes("closed today") && (
+                                  {!item.status.available && getDecideClosedLabel(item.status.reason) && (
                                     <span className="ml-auto text-[11px] font-medium px-2 py-1 rounded bg-destructive/10 text-destructive">
-                                      {item.status.reason || "Closed"}
+                                      {getDecideClosedLabel(item.status.reason)}
                                     </span>
                                   )}
                               </Button>
@@ -735,10 +739,9 @@ export default function Decide() {
                               >
                                 <Utensils size={20} className="mr-3 text-primary" />
                                 <span className="text-lg font-medium">{item.name}</span>
-                                {/* Only show a badge when it's actually closed-today (not opening-hours like \"Opens 10:00\") */}
-                                {!item.status.available && (item.status.reason || "").toLowerCase().includes("closed today") && (
+                                {!item.status.available && getDecideClosedLabel(item.status.reason) && (
                                   <span className="ml-auto text-[11px] font-medium px-2 py-1 rounded bg-destructive/10 text-destructive">
-                                    {item.status.reason || "Closed"}
+                                    {getDecideClosedLabel(item.status.reason)}
                                   </span>
                                 )}
                               </Button>

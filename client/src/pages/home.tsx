@@ -10,6 +10,7 @@ import {
   getHomeExpiryReminders,
   type ExpiryReminderItem,
 } from "../../../shared/expiry-reminders";
+import { getSingaporeDayOfWeek, getSingaporeTodayDateStr } from "../../../shared/singapore-time";
 
 const container = {
   hidden: { opacity: 0 },
@@ -50,11 +51,7 @@ export default function Home() {
     // Fetch scheduled closures and filter for today
     getClosureSchedules()
       .then(closures => {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${year}-${month}-${day}`;
+        const todayStr = getSingaporeTodayDateStr();
         
         setAllClosures(closures);
         const todayClosures = closures.filter(c => c.date === todayStr);
@@ -67,7 +64,7 @@ export default function Home() {
       .then((items: FoodItem[]) => {
         setExpiryReminders(getHomeExpiryReminders(items));
 
-        const todayDow = new Date().getDay(); // 0=Sunday, 1=Monday, ...
+        const todayDow = getSingaporeDayOfWeek();
         const result: RegularClosure[] = [];
 
         for (const item of items) {

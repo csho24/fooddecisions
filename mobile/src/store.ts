@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { FoodItem, LocationDetail, ArchivedItem } from './types';
+import { FoodItem, ArchivedItem } from './types';
 import { getFoods, createFood, updateFood, deleteFood, createArchive } from './api';
+import { checkAvailability as sharedCheckAvailability } from '../../../shared/availability';
 
 interface StoreState {
   items: FoodItem[];
@@ -12,14 +13,6 @@ interface StoreState {
   removeItem: (id: string) => Promise<void>;
   archiveItem: (id: string, status: 'eaten' | 'thrown') => Promise<void>;
   checkAvailability: (item: FoodItem, locationId?: string) => { available: boolean; reason?: string };
-}
-
-function getDay(date: Date): number {
-  return date.getDay();
-}
-
-function formatTime(date: Date): string {
-  return date.toTimeString().slice(0, 5);
 }
 
 export const useFoodStore = create<StoreState>()((set, get) => ({
@@ -78,7 +71,6 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
       const item = state.items.find((i) => i.id === id);
       if (!item) throw new Error('Item not found');
 
-      // Create archived item in database
       const archivedItem = await createArchive({
         itemId: id,
         name: item.name,
@@ -87,10 +79,8 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
         archivedAt: new Date().toISOString(),
       });
 
-      // Remove from active items
       await deleteFood(id);
 
-      // Update state
       set({
         items: state.items.filter((i) => i.id !== id),
         archivedItems: [...state.archivedItems, archivedItem],
@@ -102,32 +92,6 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
   },
 
   checkAvailability: (item: FoodItem, locationId?: string) => {
-    if (item.type === 'home') return { available: true };
-
-    let targetLocation: LocationDetail | undefined;
-    if (locationId && item.locations) {
-      targetLocation = item.locations.find(l => l.id === locationId);
-    } else if (item.locations && item.locations.length > 0) {
-      return { available: true };
-    }
-
-    const closedDays = targetLocation?.closedDays;
-    const openingHours = targetLocation?.openingHours;
-
-    const now = new Date();
-    const currentDay = getDay(now);
-    const currentTime = formatTime(now);
-
-    if (closedDays?.includes(currentDay)) {
-      return { available: false, reason: 'Closed today' };
-    }
-
-    if (openingHours) {
-      if (currentTime < openingHours.open || currentTime > openingHours.close) {
-        return { available: false, reason: `Opens ${openingHours.open} - ${openingHours.close}` };
-      }
-    }
-
-    return { available: true };
-  }
+    return sharedCheckAvailability(item, locationId);
+  },
 }));

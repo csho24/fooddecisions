@@ -63,15 +63,21 @@ export default function DecideScreen({ navigation }: DecideScreenProps) {
       }, {} as Record<string, typeof itemsWithStatus>);
     } else {
       const locationGroups: Record<string, typeof itemsWithStatus> = {};
-      itemsWithStatus.forEach(item => {
+      filtered.forEach(item => {
         if (item.locations && item.locations.length > 0) {
           item.locations.forEach(loc => {
             if (!locationGroups[loc.name]) locationGroups[loc.name] = [];
-            locationGroups[loc.name].push(item);
+            locationGroups[loc.name].push({
+              ...item,
+              status: checkAvailability(item, loc.id),
+            });
           });
         } else {
           if (!locationGroups['Unspecified']) locationGroups['Unspecified'] = [];
-          locationGroups['Unspecified'].push(item);
+          locationGroups['Unspecified'].push({
+            ...item,
+            status: checkAvailability(item),
+          });
         }
       });
       return locationGroups;
@@ -193,9 +199,9 @@ export default function DecideScreen({ navigation }: DecideScreenProps) {
                 {item.name}
               </Text>
             </View>
-            {!item.status.available && (
+            {!item.status.available && (item.status.reason === 'Closed today' || item.status.reason === 'Closed now') && (
               <View style={styles.closedBadge}>
-                <Text style={styles.closedText}>{item.status.reason || 'Closed'}</Text>
+                <Text style={styles.closedText}>{item.status.reason}</Text>
               </View>
             )}
           </View>

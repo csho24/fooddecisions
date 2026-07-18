@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { getDay, format } from 'date-fns';
 import { getFoods, createFood, updateFood, deleteFood, getArchives, createArchive, deleteArchive } from './api';
+import { checkAvailability as sharedCheckAvailability } from '../../../shared/availability';
 
 export type FoodType = 'home' | 'out';
 
@@ -181,37 +181,6 @@ export const useFoodStore = create<StoreState>()((set, get) => ({
   },
       
       checkAvailability: (item: FoodItem, locationId?: string) => {
-        if (item.type === 'home') return { available: true };
-
-        // If checking a specific location
-        let targetLocation: LocationDetail | undefined;
-        if (locationId && item.locations) {
-          targetLocation = item.locations.find(l => l.id === locationId);
-        } else if (item.locations && item.locations.length > 0) {
-           // If no location specified, check if ANY location is open? 
-           // Or just return true? Let's default to true unless all are closed.
-           // For simplicity in list view, we might just say available.
-           return { available: true };
-        }
-
-        // Fallback for legacy items or single location logic
-        const closedDays = targetLocation ? targetLocation.closedDays : item.closedDays;
-        const openingHours = targetLocation ? targetLocation.openingHours : item.openingHours;
-
-        const now = new Date();
-        const currentDay = getDay(now);
-        const currentTime = format(now, 'HH:mm');
-        
-        if (closedDays?.includes(currentDay)) {
-          return { available: false, reason: 'Closed today' };
-        }
-        
-        if (openingHours) {
-          if (currentTime < openingHours.open || currentTime > openingHours.close) {
-            return { available: false, reason: `Opens ${openingHours.open} - ${openingHours.close}` };
-          }
-        }
-
-        return { available: true };
+        return sharedCheckAvailability(item, locationId);
       }
 }));
