@@ -7,6 +7,7 @@ export interface OpeningHours {
 
 export interface AvailabilityLocation {
   id: string;
+  name?: string;
   closedDays?: number[];
   openingHours?: OpeningHours;
 }

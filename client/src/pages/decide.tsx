@@ -11,13 +11,11 @@ import { Input } from "@/components/ui/input";
 import { categorizeFood, FoodCategory } from "../../../shared/business-logic";
 import { getClosureSchedules, type ClosureSchedule } from "@/lib/api";
 import { getSingaporeTodayDateStr } from "../../../shared/singapore-time";
+import { getOutDecideStatusAtLocation } from "../../../shared/decide-availability";
 
 function getDecideClosedLabel(reason?: string): string | null {
-  if (!reason) return null;
-  const lower = reason.toLowerCase();
-  if (lower.includes("closed today")) return reason;
-  if (lower === "closed now") return "Closed now";
-  return null;
+  if (!reason?.trim()) return null;
+  return reason.trim();
 }
 
 export default function Decide() {
@@ -156,12 +154,32 @@ export default function Decide() {
 
     // Process availability for all items first (includes weekly closedDays + today's closure schedules)
     const itemsWithAvailability = filtered.map(item => {
+      if (selectedType === "out" && selectedLocation && item.type === "out") {
+        const atLoc = getOutDecideStatusAtLocation(item, selectedLocation, todaysClosures);
+        return {
+          ...item,
+          status: { available: atLoc.available, reason: atLoc.reason },
+          closedBySchedule: atLoc.closedBySchedule,
+        };
+      }
       const base = getDecideAvailability(item, selectedType === "out" ? selectedLocation : null);
       const scheduled = getScheduleClosureReason(item, selectedType === "out" ? selectedLocation : null);
       const status = scheduled.closed
-        ? { available: false as const, reason: `Closed today (${scheduled.reason})` }
+        ? {
+            available: false as const,
+            reason:
+              scheduled.reason === "Cleaning"
+                ? "Closed for cleaning"
+                : scheduled.reason === "Time off"
+                  ? "Closed for time off"
+                  : "Closed today",
+          }
         : base;
-      return { ...item, status, closedBySchedule: scheduled.closed };
+      return {
+        ...item,
+        status,
+        closedBySchedule: scheduled.closed,
+      };
     });
 
     // Grouping Logic
@@ -190,7 +208,7 @@ export default function Decide() {
         return acc;
       }, {} as Record<string, typeof itemsWithAvailability>);
     }
-  }, [items, selectedType, selectedLocation, getDecideAvailability, getScheduleClosureReason, searchQuery]);
+  }, [items, selectedType, selectedLocation, getDecideAvailability, getScheduleClosureReason, searchQuery, todaysClosures]);
 
   // Get unique locations from Out items
   const uniqueLocations = useMemo(() => {
@@ -224,7 +242,16 @@ export default function Decide() {
         status: (() => {
           const base = getDecideAvailability(item, null);
           const scheduled = getScheduleClosureReason(item, null);
-          return scheduled.closed ? { available: false as const, reason: `Closed today (${scheduled.reason})` } : base;
+          if (!scheduled.closed) return base;
+          return {
+            available: false as const,
+            reason:
+              scheduled.reason === "Cleaning"
+                ? "Closed for cleaning"
+                : scheduled.reason === "Time off"
+                  ? "Closed for time off"
+                  : "Closed today",
+          };
         })(),
         closedBySchedule: getScheduleClosureReason(item, null).closed,
         // Use saved category if it exists and is a valid FoodCategory, otherwise auto-categorize
@@ -249,16 +276,15 @@ export default function Decide() {
         item.type === 'out' && 
         item.locations?.some(loc => loc.name === selectedLocation)
       )
-      .map(item => ({
-        ...item,
-        status: (() => {
-          const base = getDecideAvailability(item, selectedLocation);
-          const scheduled = getScheduleClosureReason(item, selectedLocation);
-          return scheduled.closed ? { available: false as const, reason: `Closed today (${scheduled.reason})` } : base;
-        })(),
-        closedBySchedule: getScheduleClosureReason(item, selectedLocation).closed,
-      }));
-  }, [items, selectedType, selectedLocation, getDecideAvailability, getScheduleClosureReason]);
+      .map(item => {
+        const atLoc = getOutDecideStatusAtLocation(item, selectedLocation, todaysClosures);
+        return {
+          ...item,
+          status: { available: atLoc.available, reason: atLoc.reason },
+          closedBySchedule: atLoc.closedBySchedule,
+        };
+      });
+  }, [items, selectedType, selectedLocation, todaysClosures]);
 
   const handleTypeSelect = (type: 'home' | 'out') => {
     setSelectedType(type);
