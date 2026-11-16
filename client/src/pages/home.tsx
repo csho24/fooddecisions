@@ -11,6 +11,7 @@ import {
   type ExpiryReminderItem,
 } from "../../../shared/expiry-reminders";
 import { getSingaporeDayOfWeek, getSingaporeTodayDateStr } from "../../../shared/singapore-time";
+import { normalizedClosedDays } from "../../../shared/utils";
 
 const container = {
   hidden: { opacity: 0 },
@@ -72,9 +73,10 @@ export default function Home() {
 
           if (item.locations && item.locations.length > 0) {
             const closedLocs = item.locations.filter(loc => {
-              if (!loc.closedDays || !loc.closedDays.includes(todayDow)) return false;
+              const days = normalizedClosedDays(loc.closedDays);
+              if (!days.includes(todayDow)) return false;
               // Skip locations closed more than 5 days/week (reminder-only items like a Sunday church café)
-              return loc.closedDays.length <= 5;
+              return days.length <= 5;
             });
             if (closedLocs.length === 0) continue;
 
@@ -85,7 +87,10 @@ export default function Home() {
                 result.push({ stallName: item.name, locationName: loc.name });
               }
             }
-          } else if (item.closedDays && item.closedDays.includes(todayDow) && item.closedDays.length <= 5) {
+          } else if ((() => {
+            const days = normalizedClosedDays(item.closedDays);
+            return days.includes(todayDow) && days.length <= 5;
+          })()) {
             // Legacy: closedDays directly on item — skip reminder-only items closed 6+ days/week
             result.push({ stallName: item.name, locationName: null });
           }
@@ -128,6 +133,22 @@ export default function Home() {
   }
 
   const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const regularClosuresByLocation = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const entry of regularClosuresToday) {
+      const loc = entry.locationName?.trim() || "Other";
+      const list = map.get(loc) ?? [];
+      list.push(entry.stallName);
+      map.set(loc, list);
+    }
+    return [...map.entries()]
+      .map(([location, stalls]) => ({
+        location,
+        stalls: stalls.sort((a, b) => a.localeCompare(b)),
+      }))
+      .sort((a, b) => a.location.localeCompare(b.location));
+  }, [regularClosuresToday]);
 
   const closureBannerLines = useMemo(() => {
     if (todaysClosures.length === 0) return [];
@@ -238,7 +259,7 @@ export default function Home() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-foreground text-base mb-1">Closed Today</p>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {closureBannerLines
                     .filter(line => {
                       if (line.type !== 'timeoff') return true;
@@ -259,12 +280,15 @@ export default function Home() {
                       </div>
                     )
                   ))}
-                  {regularClosuresToday.map((entry, i) => (
-                    <p key={`reg-${i}`} className="text-muted-foreground text-sm">
-                      {entry.locationName
-                        ? `${entry.stallName} (${entry.locationName})`
-                        : entry.stallName}
-                    </p>
+                  {regularClosuresByLocation.map((group) => (
+                    <div key={group.location} className="space-y-0.5">
+                      <p className="text-foreground text-sm font-medium">{group.location}</p>
+                      {group.stalls.map((stall) => (
+                        <p key={`${group.location}-${stall}`} className="text-muted-foreground text-sm pl-2">
+                          {stall}
+                        </p>
+                      ))}
+                    </div>
                   ))}
                 </div>
               </div>

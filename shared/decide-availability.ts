@@ -4,7 +4,7 @@ import {
   type AvailabilityLocation,
 } from './availability';
 import { getSingaporeDayOfWeek } from './singapore-time';
-import { normalizeClosureType, normalizeLocKey } from './utils';
+import { normalizeClosureType, normalizeLocKey, normalizedClosedDays } from './utils';
 
 export interface TodayClosure {
   type: string;
@@ -25,8 +25,8 @@ export function isRegularClosedTodayAtLocation(
   loc: Pick<AvailabilityLocation, 'closedDays'>,
   now = new Date()
 ): boolean {
-  const closedDays = loc.closedDays;
-  if (!closedDays?.length) return false;
+  const closedDays = normalizedClosedDays(loc.closedDays);
+  if (!closedDays.length) return false;
   if (closedDays.length > 5) return false;
   return closedDays.includes(getSingaporeDayOfWeek(now));
 }
@@ -113,7 +113,7 @@ export function getOutDecideStatusAtLocation(
   }
 
   const locKey = normalizeLocKey(locationName);
-  const target = item.locations?.find((l) => normalizeLocKey(l.name) === locKey);
+  const target = item.locations?.find((l) => normalizeLocKey(l.name ?? '') === locKey);
   if (!target) {
     return { available: true, closedBySchedule: false };
   }

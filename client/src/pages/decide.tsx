@@ -12,6 +12,7 @@ import { categorizeFood, FoodCategory } from "../../../shared/business-logic";
 import { getClosureSchedules, type ClosureSchedule } from "@/lib/api";
 import { getSingaporeTodayDateStr } from "../../../shared/singapore-time";
 import { getOutDecideStatusAtLocation } from "../../../shared/decide-availability";
+import { normalizeLocKey } from "../../../shared/utils";
 
 function getDecideClosedLabel(reason?: string): string | null {
   if (!reason?.trim()) return null;
@@ -271,18 +272,23 @@ export default function Decide() {
   // Get items for selected location
   const itemsByLocation = useMemo(() => {
     if (selectedType !== 'out' || !selectedLocation) return [];
+    const locKey = normalizeLocKey(selectedLocation);
     return items
-      .filter(item => 
-        item.type === 'out' && 
-        item.locations?.some(loc => loc.name === selectedLocation)
+      .filter(item =>
+        item.type === 'out' &&
+        item.locations?.some((loc) => normalizeLocKey(loc.name) === locKey)
       )
-      .map(item => {
+      .map((item) => {
         const atLoc = getOutDecideStatusAtLocation(item, selectedLocation, todaysClosures);
         return {
           ...item,
           status: { available: atLoc.available, reason: atLoc.reason },
           closedBySchedule: atLoc.closedBySchedule,
         };
+      })
+      .sort((a, b) => {
+        if (a.status.available === b.status.available) return a.name.localeCompare(b.name);
+        return a.status.available ? 1 : -1;
       });
   }, [items, selectedType, selectedLocation, todaysClosures]);
 
@@ -630,25 +636,33 @@ export default function Decide() {
                             ← Back to Locations
                           </Button>
                           <div className="space-y-3">
-                            {itemsByLocation.map(item => (
+                            {itemsByLocation.map((item) => (
                               <Button
                                 key={item.id}
                                 variant="outline"
-                                  className={cn(
-                                    "w-full h-16 text-left justify-start rounded-xl",
-                                    // @ts-expect-error - injected at runtime in Decide maps
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    (item as any).closedBySchedule && "bg-red-50 border-red-200 text-red-950 hover:bg-red-50/80"
-                                  )}
+                                className={cn(
+                                  "w-full min-h-16 text-left justify-start rounded-xl gap-2",
+                                  !item.status.available &&
+                                    "bg-muted/50 border-border text-muted-foreground hover:bg-muted/60",
+                                  item.closedBySchedule &&
+                                    "bg-red-50 border-red-200 text-red-950 hover:bg-red-50/80"
+                                )}
                                 onClick={() => setSelectedFoodFromLocation(item.name)}
                               >
-                                <Utensils size={20} className="mr-3 text-primary" />
-                                  <span className="text-lg font-medium">{item.name}</span>
-                                  {!item.status.available && getDecideClosedLabel(item.status.reason) && (
-                                    <span className="ml-auto text-[11px] font-medium px-2 py-1 rounded bg-destructive/10 text-destructive">
-                                      {getDecideClosedLabel(item.status.reason)}
-                                    </span>
+                                <Utensils size={20} className="mr-1 shrink-0 text-primary" />
+                                <span
+                                  className={cn(
+                                    "text-lg font-medium flex-1 text-left",
+                                    !item.status.available && "line-through decoration-muted-foreground/60"
                                   )}
+                                >
+                                  {item.name}
+                                </span>
+                                {!item.status.available && getDecideClosedLabel(item.status.reason) && (
+                                  <span className="ml-auto shrink-0 text-[11px] font-medium px-2 py-1 rounded bg-destructive/10 text-destructive whitespace-normal text-right max-w-[45%] leading-tight">
+                                    {getDecideClosedLabel(item.status.reason)}
+                                  </span>
+                                )}
                               </Button>
                             ))}
                           </div>

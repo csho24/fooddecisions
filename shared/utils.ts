@@ -21,6 +21,14 @@ export function normalizeLocKey(str: string): string {
   return str.trim().toLowerCase();
 }
 
+/** Normalize stored closedDays (JSON occasionally has string day ids). */
+export function normalizedClosedDays(closedDays: unknown): number[] {
+  if (!Array.isArray(closedDays)) return [];
+  return closedDays
+    .map((d) => (typeof d === 'number' ? d : parseInt(String(d), 10)))
+    .filter((d) => !Number.isNaN(d) && d >= 0 && d <= 6);
+}
+
 /** Normalize API/DB closure type strings for comparisons and styling. */
 export function normalizeClosureType(
   type: string | undefined | null

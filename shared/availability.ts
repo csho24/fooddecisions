@@ -1,4 +1,5 @@
 import { getSingaporeDayOfWeek, getSingaporeTimeHHmm } from './singapore-time';
+import { normalizedClosedDays } from './utils';
 
 export interface OpeningHours {
   open: string;
@@ -32,7 +33,8 @@ export function checkLocationAvailability(
   const currentDay = getSingaporeDayOfWeek(now);
   const currentTime = getSingaporeTimeHHmm(now);
 
-  if (closedDays?.includes(currentDay)) {
+  const days = normalizedClosedDays(closedDays);
+  if (days.includes(currentDay)) {
     return { available: false, reason: 'Closed today' };
   }
 
